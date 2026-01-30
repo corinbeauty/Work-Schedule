@@ -75,12 +75,24 @@
 
     <div id="app" class="max-w-full mx-auto">
         <header class="mb-6 flex flex-col md:flex-row justify-between items-end gap-4 no-print">
-            <div>
-                <h1 id="tableTitle" class="text-2xl font-bold text-slate-800">月度預排休假表</h1>
-                <div class="flex items-center gap-3 mt-2">
-                    <button onclick="changeMonth(-1)" class="p-1 hover:bg-slate-200 rounded"><i data-lucide="chevron-left"></i></button>
-                    <span id="monthDisplay" class="font-medium text-slate-600">2026年 2月</span>
-                    <button onclick="changeMonth(1)" class="p-1 hover:bg-slate-200 rounded"><i data-lucide="chevron-right"></i></button>
+            <div class="flex items-end gap-6">
+                <div>
+                    <h1 id="tableTitle" class="text-2xl font-bold text-slate-800">月度預排休假表</h1>
+                    <div class="flex items-center gap-3 mt-2">
+                        <button onclick="changeMonth(-1)" class="p-1 hover:bg-slate-200 rounded"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
+                        <span id="monthDisplay" class="font-medium text-slate-600">2026年 2月</span>
+                        <button onclick="changeMonth(1)" class="p-1 hover:bg-slate-200 rounded"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                    </div>
+                </div>
+                
+                <!-- 復原/重做 按鈕 -->
+                <div class="flex gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
+                    <button onclick="undo()" id="undoBtn" class="p-1.5 text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-400 transition" title="復原 (Ctrl+Z)">
+                        <i data-lucide="undo-2" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="redo()" id="redoBtn" class="p-1.5 text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-400 transition" title="下一步 (Ctrl+Y)">
+                        <i data-lucide="redo-2" class="w-4 h-4"></i>
+                    </button>
                 </div>
             </div>
 
@@ -111,7 +123,7 @@
             <span class="flex items-center gap-1"><i data-lucide="info" class="w-3 h-3"></i> 點擊工具列班次後，再點擊表格內容即可套用</span>
             <span>● 點擊「+」可新增該班別人員</span>
             <span>● 點擊姓名可修改</span>
-            <span>● 週末與國定假日自動標紅</span>
+            <span>● 支援快捷鍵 Ctrl+Z 復原 / Ctrl+Y 重做</span>
         </div>
     </div>
 
@@ -134,7 +146,11 @@
     <script>
         let currentYear = 2026;
         let currentMonth = 1;
-        let selectedTool = ""; // 當前選中的工具
+        let selectedTool = ""; 
+
+        // 歷史記錄棧
+        let historyStack = [];
+        let redoStack = [];
 
         const shiftTypes = [
             { id: "", label: "清除", color: "bg-slate-100 text-slate-600" },
@@ -145,7 +161,6 @@
             { id: "離職", label: "離職", color: "bg-slate-200 text-slate-400" }
         ];
 
-        // 初始名單資料
         let staffGroups = [
             { group: "早班", members: ["黃詩涵", "劉芸汶", "林詩涵"] },
             { group: "中班", members: ["賴彥廷", "莊秉豐", "黃靖雯", "呂佳霖"] },
@@ -165,9 +180,68 @@
         function init() {
             renderToolbar();
             renderMonthlyTable();
+            updateHistoryButtons();
             lucide.createIcons();
+            
+            // 監聽快捷鍵
+            window.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    if (e.key === 'z') { e.preventDefault(); undo(); }
+                    if (e.key === 'y') { e.preventDefault(); redo(); }
+                }
+            });
         }
 
+        // --- 歷史記錄核心 ---
+        function saveHistory() {
+            historyStack.push({
+                schedule: JSON.parse(JSON.stringify(schedule)),
+                staffGroups: JSON.parse(JSON.stringify(staffGroups))
+            });
+            redoStack = []; // 有新動作時清空重做棧
+            if (historyStack.length > 50) historyStack.shift(); // 限制 50 步
+            updateHistoryButtons();
+        }
+
+        function undo() {
+            if (historyStack.length === 0) return;
+            redoStack.push({
+                schedule: JSON.parse(JSON.stringify(schedule)),
+                staffGroups: JSON.parse(JSON.stringify(staffGroups))
+            });
+            const lastState = historyStack.pop();
+            schedule = lastState.schedule;
+            staffGroups = lastState.staffGroups;
+            renderMonthlyTable();
+            updateHistoryButtons();
+        }
+
+        function redo() {
+            if (redoStack.length === 0) return;
+            historyStack.push({
+                schedule: JSON.parse(JSON.stringify(schedule)),
+                staffGroups: JSON.parse(JSON.stringify(staffGroups))
+            });
+            const nextState = redoStack.pop();
+            schedule = nextState.schedule;
+            staffGroups = nextState.staffGroups;
+            renderMonthlyTable();
+            updateHistoryButtons();
+        }
+
+        function updateHistoryButtons() {
+            const uBtn = document.getElementById('undoBtn');
+            const rBtn = document.getElementById('redoBtn');
+            uBtn.disabled = historyStack.length === 0;
+            rBtn.disabled = redoStack.length === 0;
+            
+            uBtn.classList.toggle('text-slate-400', uBtn.disabled);
+            uBtn.classList.toggle('text-indigo-600', !uBtn.disabled);
+            rBtn.classList.toggle('text-slate-400', rBtn.disabled);
+            rBtn.classList.toggle('text-indigo-600', !rBtn.disabled);
+        }
+
+        // --- 介面渲染 ---
         function renderToolbar() {
             const container = document.getElementById('toolbar');
             container.innerHTML = shiftTypes.map(t => `
@@ -176,7 +250,7 @@
                     ${t.label || '空'}
                 </button>
             `).join('');
-            selectTool(""); // 預設空工具
+            selectTool(""); 
         }
 
         function selectTool(id) {
@@ -195,17 +269,15 @@
             return new Date(year, month + 1, 0).getDate();
         }
 
-        // 天氣判斷邏輯 (依據月份平均值)
         function getWeather(date) {
             const month = date.getMonth();
             const day = date.getDate();
-            // 簡單模擬邏輯：2月台北通常冷且多雨
             const seed = (month * 31 + day) % 10;
-            if (month <= 2 || month >= 10) { // 冷季
+            if (month <= 2 || month >= 10) {
                 if (seed < 3) return { label: "雨", color: "text-blue-400" };
                 if (seed < 7) return { label: "冷", color: "text-indigo-500" };
                 return { label: "暖", color: "text-orange-400" };
-            } else { // 熱季
+            } else {
                 if (seed < 2) return { label: "雨", color: "text-blue-400" };
                 if (seed < 8) return { label: "晴", color: "text-amber-500" };
                 return { label: "暖", color: "text-rose-500" };
@@ -229,7 +301,6 @@
             document.getElementById('tableTitle').innerText = `${currentMonth + 1}月 預排休假表`;
             document.getElementById('monthDisplay').innerText = `${currentYear}年 ${currentMonth + 1}月`;
 
-            // 1. 表頭 (增加天氣列)
             let h_weather = `<tr class="bg-slate-50"><th colspan="2" class="sticky-col bg-slate-50 text-[10px] text-slate-400">天氣</th>`;
             let h1 = `<tr class="bg-slate-50"><th colspan="2" class="sticky-col bg-slate-50">節慶</th>`;
             let h2 = `<tr><th class="sticky-col">班別</th><th class="sticky-col" style="left:40px">姓名/星期</th>`;
@@ -241,7 +312,6 @@
                 let isHoliday = holidays[dateStr] || false;
                 let isWeekend = (date.getDay() === 0 || date.getDay() === 6);
                 let colorClass = (isHoliday || isWeekend) ? "weekend-text" : "";
-                
                 const weather = getWeather(date);
 
                 h_weather += `<th class="${weather.color} font-bold text-[10px]">${weather.label}</th>`;
@@ -251,10 +321,8 @@
             }
             h_weather += `<th class="bg-slate-100"></th></tr>`;
             h1 += `<th rowspan="3" class="w-12 bg-slate-100">共休</th></tr>`;
-            
             head.innerHTML = h_weather + h1 + h2 + h3;
 
-            // 2. 表身
             let bodyHtml = "";
             staffGroups.forEach((g, gIdx) => {
                 const groupClass = `group-${g.group}`;
@@ -297,7 +365,6 @@
             });
             body.innerHTML = bodyHtml;
 
-            // 3. 表尾
             let footHtml = `<tr class="bg-slate-100 font-bold"><td colspan="2" class="sticky-col bg-slate-100">每日休假人數</td>`;
             for (let d = 1; d <= daysCount; d++) {
                 let dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -314,18 +381,21 @@
             updatePrintReport();
         }
 
-        // --- 人員管理 ---
+        // --- 功能操作與歷史保存 ---
         function addMember(gIdx) {
+            saveHistory();
             staffGroups[gIdx].members.push("新人員");
             renderMonthlyTable();
         }
 
         function removeMember(gIdx, mIdx) {
+            saveHistory();
             staffGroups[gIdx].members.splice(mIdx, 1);
             renderMonthlyTable();
         }
 
         function updateMemberName(gIdx, mIdx, newName) {
+            saveHistory();
             const oldName = staffGroups[gIdx].members[mIdx];
             staffGroups[gIdx].members[mIdx] = newName;
             Object.keys(schedule).forEach(date => {
@@ -337,7 +407,6 @@
             renderMonthlyTable();
         }
 
-        // --- 排班工具套用 ---
         function applyTool(dateStr, name, dayNum) {
             if (!schedule[dateStr]) schedule[dateStr] = {};
             
@@ -346,12 +415,16 @@
                 document.getElementById('resignText').innerText = `是否將 ${name} 從 ${dateStr} 之後的所有日期皆標記為「離職」？`;
                 document.getElementById('resignModal').classList.remove('hidden');
             } else {
-                schedule[dateStr][name] = selectedTool;
-                renderMonthlyTable();
+                if (schedule[dateStr][name] !== selectedTool) {
+                    saveHistory();
+                    schedule[dateStr][name] = selectedTool;
+                    renderMonthlyTable();
+                }
             }
         }
 
         function handleResignConfirm(applyToFuture) {
+            saveHistory();
             const { dateStr, name, dayNum } = resignContext;
             const daysCount = getDaysInMonth(currentYear, currentMonth);
 
@@ -381,8 +454,9 @@
                 let dayData = schedule[dateStr] || {};
 
                 const getWorking = (group) => {
-                    const groupMembers = staffGroups.find(g => g.group === group).members;
-                    return groupMembers.filter(m => dayData[m] && dayData[m] !== '休' && dayData[m] !== '離職' && m !== '待補');
+                    const g = staffGroups.find(g => g.group === group);
+                    if (!g) return [];
+                    return g.members.filter(m => dayData[m] && dayData[m] !== '休' && dayData[m] !== '離職' && m !== '待補');
                 };
 
                 const morning = getWorking("早班");
