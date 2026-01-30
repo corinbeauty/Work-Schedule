@@ -43,6 +43,7 @@
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                console.log("Firebase Connected: ", user.uid);
                 window.loadGlobalState(); 
             }
         });
@@ -61,11 +62,17 @@
         .shift-group-col { position: sticky; left: 0; z-index: 20; background: #f8fafc; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; width: 30px !important; min-width: 30px !important; border-right: 1px solid #cbd5e1; }
         .name-col-sticky { position: sticky; left: 30px; z-index: 19; background: #fff; border-right: 2px solid #cbd5e1; width: 105px !important; min-width: 105px !important; }
 
+        /* 班別底色恢復 */
+        .group-早班 { background-color: #fefce8 !important; }
+        .group-中班 { background-color: #f0fdf4 !important; }
+        .group-晚班 { background-color: #eff6ff !important; }
+        .group-夜班 { background-color: #faf5ff !important; }
+
         .weekend-text { color: #ef4444; font-weight: bold; }
         .holiday-bg { background-color: rgba(254, 226, 226, 0.4); }
         .cell-off { color: #ef4444; font-weight: bold; }
         
-        /* 選取工具動畫與視覺 */
+        /* 選取工具視覺效果 */
         .tool-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
         .active-tool { 
             outline: 3px solid #6366f1 !important; 
@@ -76,6 +83,7 @@
         }
         
         .name-input { width: 90px; border: none; outline: none; background: transparent; font-size: 0.75rem; text-align: center; font-weight: 700; }
+        .name-input:focus { background: rgba(255,255,255,0.1); border-radius: 4px; }
         
         .modal-overlay { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 100; }
         .draggable-handle { cursor: move; }
@@ -87,7 +95,6 @@
         .report-table-final td { border: 1px solid #1e293b; height: 26px; text-align: center; }
         .editable-cell:focus { background: #f0f9ff; outline: 1px solid #3b82f6; }
 
-        /* 管理員權限 */
         .admin-only { display: none !important; }
         body.is-admin .admin-only { display: flex !important; }
         
@@ -227,7 +234,7 @@
         </div>
     </div>
 
-    <!-- 排班邏輯與週報表其餘彈窗內容保持一致 -->
+    <!-- 排班邏輯與週報表彈窗 -->
     <div id="logicSettingsModal" class="fixed inset-0 modal-overlay hidden flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden border border-slate-300">
             <div class="bg-slate-900 p-4 text-white flex justify-between items-center">
@@ -245,7 +252,7 @@
                 </div>
                 <div id="addLogicContainer" class="grid grid-cols-6 gap-3 items-end p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100"></div>
                 <div class="mt-8 flex justify-end gap-3 border-t pt-4">
-                    <button onclick="addLogicRow()" class="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold text-sm shadow-md">新增邏輯項目</button>
+                    <button onclick="addLogicRow()" class="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold text-sm shadow-md transition hover:bg-indigo-700">新增邏輯項目</button>
                     <button onclick="saveLogicToCloud()" class="bg-emerald-600 text-white px-10 py-2 rounded-xl font-bold text-sm shadow-lg">儲存雲端設定</button>
                 </div>
             </div>
@@ -312,7 +319,6 @@
         const POS_MAIN_OPTIONS = ["機","拉","A下","A上","B","櫃結","外B","消毒"];
         const POS_SUB_OPTIONS = ["機","拉","A下","B","櫃結","外B","B結"];
 
-        // 初始化時直接渲染預設表格，避免空白
         function init() { 
             renderToolbar(); 
             renderMonthlyTable(); 
@@ -322,17 +328,17 @@
 
         function getSafeDateStr(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
 
-        // --- 核心：雲端載入 ---
+        // --- 核心：雲端載入 (路徑段落化修復) ---
         window.loadGlobalState = async () => {
             if(!window.auth.currentUser) return;
-            const path = (c) => `artifacts/${window.appId}/public/data/${c}`;
+            const appId = window.appId;
             try {
                 const [sS, pS, hS, lS, tS] = await Promise.all([
-                    window.fbGetDoc(window.fbDoc(window.db, path('main_schedule'), 'current')),
-                    window.fbGetDoc(window.fbDoc(window.db, path('personnel_config'), 'current')),
-                    window.fbGetDoc(window.fbDoc(window.db, path('holiday_remarks'), 'current')),
-                    window.fbGetDoc(window.fbDoc(window.db, path('logic'), 'current')),
-                    window.fbGetDoc(window.fbDoc(window.db, path('toolbar_settings'), 'current'))
+                    window.fbGetDoc(window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', 'main_schedule', 'current')),
+                    window.fbGetDoc(window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', 'personnel_config', 'current')),
+                    window.fbGetDoc(window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', 'holiday_remarks', 'current')),
+                    window.fbGetDoc(window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', 'logic', 'current')),
+                    window.fbGetDoc(window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', 'toolbar_settings', 'current'))
                 ]);
                 if(sS.exists()) schedule = sS.data().schedule || {};
                 if(pS.exists()) { staffGroups = pS.data().staffGroups || staffGroups; requiredStaffCount = pS.data().requiredStaffCount || 15; document.getElementById('leaveSummary').value = pS.data().leaveSummary || "4例4休6國"; }
@@ -343,13 +349,14 @@
                 renderMonthlyTable();
                 document.getElementById('modifyTime').innerText = `已同步：${new Date().toLocaleTimeString()}`;
                 lucide.createIcons();
-            } catch(e) { console.error(e); }
+            } catch(e) { console.error("Sync Error:", e); }
         };
 
         function triggerAutoSave() {
             if(saveTimeout) clearTimeout(saveTimeout);
-            document.getElementById('syncBadge').style.display = 'flex';
-            document.getElementById('syncBadge').classList.remove('badge-success');
+            const badge = document.getElementById('syncBadge');
+            badge.style.display = 'flex';
+            badge.classList.remove('badge-success');
             document.getElementById('syncText').innerText = "雲端同步中...";
             document.getElementById('syncIcon').innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4 animate-spin text-indigo-400"></i>';
             lucide.createIcons();
@@ -357,32 +364,31 @@
             saveTimeout = setTimeout(async () => {
                 try {
                     await performCloudSave();
-                    // 顯示成功狀態後消失
-                    document.getElementById('syncBadge').classList.add('badge-success');
+                    badge.classList.add('badge-success');
                     document.getElementById('syncText').innerText = "同步完成";
                     document.getElementById('syncIcon').innerHTML = '<i data-lucide="check" class="w-4 h-4 text-white"></i>';
                     lucide.createIcons();
-                    setTimeout(() => { document.getElementById('syncBadge').style.display = 'none'; }, 1000);
+                    setTimeout(() => { badge.style.display = 'none'; }, 1000);
                 } catch(e) {
                     document.getElementById('syncText').innerText = "同步失敗";
-                    setTimeout(() => { document.getElementById('syncBadge').style.display = 'none'; }, 2000);
+                    console.error(e);
                 }
             }, 500); 
         }
 
         async function performCloudSave() {
             if(!window.auth.currentUser) return;
-            const path = (c) => `artifacts/${window.appId}/public/data/${c}`;
+            const appId = window.appId;
             try {
                 await Promise.all([
-                    window.fbSetDoc(window.fbDoc(window.db, path('main_schedule'), 'current'), { schedule }),
-                    window.fbSetDoc(window.fbDoc(window.db, path('personnel_config'), 'current'), { staffGroups, requiredStaffCount, leaveSummary: document.getElementById('leaveSummary').value }),
-                    window.fbSetDoc(window.fbDoc(window.db, path('holiday_remarks'), 'current'), { remarks: holidayRemarks })
+                    window.fbSetDoc(window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', 'main_schedule', 'current'), { schedule }),
+                    window.fbSetDoc(window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', 'personnel_config', 'current'), { staffGroups, requiredStaffCount, leaveSummary: document.getElementById('leaveSummary').value }),
+                    window.fbSetDoc(window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', 'holiday_remarks', 'current'), { remarks: holidayRemarks })
                 ]);
-                document.getElementById('modifyTime').innerText = `已同步：${new Date().toLocaleTimeString()}`;
             } catch(e) { throw e; }
         }
 
+        // --- 渲染 ---
         function renderMonthlyTable() {
             const daysCount=getDaysInMonth(currentYear,currentMonth), head=document.getElementById('tableHead'), body=document.getElementById('tableBody');
             document.getElementById('monthDisplay').innerText=`${currentYear}年 ${currentMonth+1}月`;
@@ -459,14 +465,14 @@
             shiftTypes.push({ id: label, label, color });
             document.getElementById('newToolLabel').value = '';
             renderToolList();
-            renderToolbar(); // 立即同步顯示在前端預覽
+            renderToolbar();
             lucide.createIcons();
         }
         function removeTool(i) { shiftTypes.splice(i, 1); renderToolList(); renderToolbar(); lucide.createIcons(); }
         async function saveToolsToCloud() {
             if(!window.auth.currentUser) return;
             try {
-                await window.fbSetDoc(window.fbDoc(window.db, `artifacts/${window.appId}/public/data/toolbar_settings`, 'current'), { data: shiftTypes });
+                await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'toolbar_settings', 'current'), { data: shiftTypes });
                 alert("快速選取列已儲存！");
                 closeToolManager();
             } catch(e) { alert("儲存失敗"); }
@@ -532,12 +538,12 @@
             document.getElementById('weeklyConfirmView').classList.remove('hidden'); lucide.createIcons();
         }
 
-        async function saveWeeklyToDatabase() { if(!window.auth.currentUser) return; const data = Array.from(document.querySelectorAll('.day-card-container')).map(c => ({ date: c.getAttribute('data-date'), html: c.innerHTML })); try { await window.fbSetDoc(window.fbDoc(window.db, `artifacts/${window.appId}/public/data/reports`, `week_${data[0].date}`), { createdAt: new Date().toISOString(), data }); alert("存檔成功"); } catch(e) { alert("失敗"); }}
+        async function saveWeeklyToDatabase() { if(!window.auth.currentUser) return; const data = Array.from(document.querySelectorAll('.day-card-container')).map(c => ({ date: c.getAttribute('data-date'), html: c.innerHTML })); try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'reports', `week_${data[0].date}`), { createdAt: new Date().toISOString(), data }); alert("存檔成功"); } catch(e) { alert("失敗"); }}
         function closeWeeklyConfirm() { document.getElementById('weeklyConfirmView').classList.add('hidden'); }
         function startEditLogic(i) { editLogicIndex = i; renderLogicList(); }
         function cancelEditLogic() { editLogicIndex = -1; renderLogicList(); }
         function confirmEditLogic(i) { shiftLogic[i] = { group: document.getElementById('editGroup').value, code: document.getElementById('editCode').value.trim(), person: document.getElementById('editStaff').value, time: document.getElementById('editTime').value, posMain: document.getElementById('editPosMain').value, posSub: document.getElementById('editPosSub').value }; editLogicIndex = -1; renderLogicList(); }
-        async function saveLogicToCloud() { try { await window.fbSetDoc(window.fbDoc(window.db, `artifacts/${window.appId}/public/data/logic`, 'current'), { data: shiftLogic }); alert("保存成功"); } catch(e) { alert("失敗"); }}
+        async function saveLogicToCloud() { try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'logic', 'current'), { data: shiftLogic }); alert("保存成功"); } catch(e) { alert("失敗"); }}
         
         function generateVacationList() {
             const s=document.getElementById('vacationStart').value, e=document.getElementById('vacationEnd').value; if(!s||!e) return;
