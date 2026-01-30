@@ -59,8 +59,10 @@
         .group-夜班 { background-color: #faf5ff; }
 
         .active-tool { ring: 2px; ring-color: #4f46e5; border-color: white !important; }
-        .draggable-tool { cursor: grab; transition: transform 0.2s; }
-        .draggable-tool:active { cursor: grabbing; transform: scale(0.95); }
+        
+        .drag-item { cursor: grab; }
+        .drag-item:active { cursor: grabbing; }
+        .drag-over { border-top: 2px solid #4f46e5; }
         
         #reportPrintArea { display: none; }
         @media print {
@@ -73,6 +75,12 @@
             .report-table td { border: 1px solid #000; height: 22px; text-align: center; }
             @page { size: A4 portrait; margin: 5mm; }
         }
+
+        /* 管理員限定元件隱藏邏輯 */
+        .admin-only { display: none; }
+        body.is-admin .admin-only { display: block; }
+        body.is-admin .admin-only-flex { display: flex; }
+        body.is-admin .admin-only-inline { display: inline-block; }
     </style>
 </head>
 <body class="p-4">
@@ -107,9 +115,16 @@
                 </button>
             </div>
 
-            <div class="flex gap-2">
-                <button onclick="window.print()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs hover:bg-slate-900 transition shadow-sm">
-                    <i data-lucide="printer" class="w-3 h-3"></i> 輸出日報表
+            <div class="flex gap-2 items-center">
+                <!-- 管理者專區 -->
+                <div class="admin-only">
+                    <button onclick="window.print()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs hover:bg-slate-900 transition shadow-sm">
+                        <i data-lucide="printer" class="w-3 h-3"></i> 輸出日報表
+                    </button>
+                </div>
+                <!-- 登入按鈕 -->
+                <button id="adminBtn" onclick="toggleAdmin()" class="p-2 text-slate-400 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm transition">
+                    <i data-lucide="lock" id="adminIcon" class="w-4 h-4"></i>
                 </button>
             </div>
         </header>
@@ -123,12 +138,27 @@
         </div>
 
         <div class="mt-3 text-[10px] text-slate-400 no-print flex flex-wrap gap-4 uppercase tracking-tighter items-center">
-            <span class="flex items-center gap-1"><i data-lucide="info" class="w-3 h-3"></i> 工具排序：按住按鈕左右拖移即可。</span>
+            <span class="flex items-center gap-1"><i data-lucide="info" class="w-3 h-3"></i> 快速選取：點擊上方項目後，直接點擊表格單元格進行排班。</span>
             <span>● 「節慶」欄位點擊可填寫自定義備註</span>
-            <span>● 支援 Ctrl+Z/Y 快捷鍵</span>
-            <div class="ml-auto flex items-center gap-4">
-                <span class="opacity-60">© 原點數位科技</span>
-                <span class="font-mono opacity-60">版本：v26.1.30.15</span>
+            <span class="admin-only">● 管理者模式已啟動：可增減人員與輸出報表</span>
+            <div class="ml-auto flex flex-col items-end gap-1">
+                <div class="flex items-center gap-4">
+                    <span class="opacity-60">© 原點數位科技</span>
+                    <span class="font-mono opacity-60">版本：v26.1.30.15</span>
+                </div>
+                <div id="modifyTime" class="text-[9px] opacity-40 italic">最後修改時間：-</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 登入彈窗 -->
+    <div id="loginModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50 no-print">
+        <div class="bg-white p-5 rounded-xl shadow-xl w-64 text-center">
+            <h3 class="text-base font-bold mb-4">管理者登入</h3>
+            <input type="password" id="adminPassword" class="w-full border rounded-lg px-3 py-2 text-sm mb-4 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="輸入密碼...">
+            <div class="flex justify-center gap-2">
+                <button onclick="closeLogin()" class="px-4 py-1.5 text-slate-400 hover:bg-slate-50 rounded-lg text-xs">取消</button>
+                <button onclick="verifyPassword()" class="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs">確定</button>
             </div>
         </div>
     </div>
@@ -160,11 +190,14 @@
 
     <!-- 工具管理彈窗 -->
     <div id="toolManagerModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50 no-print">
-        <div class="bg-white p-6 rounded-xl shadow-xl w-[400px]">
-            <h3 class="text-base font-bold mb-4">管理自定義班次</h3>
-            <div class="space-y-3 max-h-60 overflow-y-auto mb-4" id="toolManagerList"></div>
+        <div class="bg-white p-6 rounded-xl shadow-xl w-[420px]">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-base font-bold">管理快速選取項目</h3>
+                <span class="text-[9px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">提示：拖曳左側圖示可調整排序</span>
+            </div>
+            <div class="space-y-2 max-h-80 overflow-y-auto mb-4 p-1" id="toolManagerList"></div>
             <div class="border-t pt-4">
-                <p class="text-[10px] font-bold text-slate-400 mb-2 uppercase">新增選項</p>
+                <p class="text-[10px] font-bold text-slate-400 mb-2 uppercase">新增自定義項目</p>
                 <div class="flex gap-2">
                     <input type="text" id="newToolLabel" placeholder="名稱 (如: 0930)" class="flex-1 border rounded px-2 py-1 text-xs">
                     <select id="newToolColor" class="border rounded px-2 py-1 text-xs">
@@ -179,7 +212,7 @@
                 </div>
             </div>
             <div class="mt-6 flex justify-end">
-                <button onclick="closeToolManager()" class="px-4 py-1.5 bg-slate-100 rounded-lg text-[11px]">關閉</button>
+                <button onclick="closeToolManager()" class="px-4 py-1.5 bg-slate-100 rounded-lg text-[11px] font-medium hover:bg-slate-200">完成關閉</button>
             </div>
         </div>
     </div>
@@ -192,6 +225,7 @@
         let currentYear = 2026;
         let currentMonth = 1;
         let selectedTool = ""; 
+        let isAdmin = false;
 
         let historyStack = [];
         let redoStack = [];
@@ -213,7 +247,6 @@
             { group: "夜班", members: ["黃品睿", "王楷翔", "施孟均"] }
         ];
 
-        // 台灣 2026 國定假日基礎資料
         const baseHolidays = {
             "2026-01-01": "元旦", "2026-01-20": "初二", "2026-02-03": "十六",
             "2026-02-16": "除夕", "2026-02-17": "初一", "2026-02-18": "初二", "2026-02-19": "初三", "2026-02-20": "初四", "2026-02-21": "初五",
@@ -227,7 +260,7 @@
             "2026-11-10": "初二", "2026-11-24": "十六", "2026-12-10": "初二", "2026-12-24": "十六"
         };
 
-        let holidayRemarks = {}; // 使用者自定義備註
+        let holidayRemarks = {}; 
         let schedule = {};
         let resignContext = null;
         let holidayEditContext = null;
@@ -246,6 +279,39 @@
             });
         }
 
+        // --- 管理員權限功能 ---
+        function toggleAdmin() {
+            if (isAdmin) {
+                isAdmin = false;
+                document.body.classList.remove('is-admin');
+                document.getElementById('adminIcon').setAttribute('data-lucide', 'lock');
+                lucide.createIcons();
+                renderMonthlyTable();
+            } else {
+                document.getElementById('loginModal').classList.remove('hidden');
+                document.getElementById('adminPassword').focus();
+            }
+        }
+
+        function closeLogin() {
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('adminPassword').value = '';
+        }
+
+        function verifyPassword() {
+            const pwd = document.getElementById('adminPassword').value;
+            if (pwd === "1234") {
+                isAdmin = true;
+                document.body.classList.add('is-admin');
+                document.getElementById('adminIcon').setAttribute('data-lucide', 'unlock');
+                closeLogin();
+                lucide.createIcons();
+                renderMonthlyTable();
+            } else {
+                alert("密碼錯誤！");
+            }
+        }
+
         // --- 歷史記錄 ---
         function saveHistory() {
             historyStack.push({
@@ -257,6 +323,10 @@
             redoStack = [];
             if (historyStack.length > 50) historyStack.shift();
             updateHistoryButtons();
+            
+            // 更新最後修改時間
+            const now = new Date();
+            document.getElementById('modifyTime').innerText = `最後修改時間：${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
         }
 
         function undo() {
@@ -302,38 +372,19 @@
             rBtn.disabled = redoStack.length === 0;
         }
 
-        // --- 工具列與排序 ---
+        // --- 工具列渲染 ---
         function renderToolbar() {
             const container = document.getElementById('toolbar');
-            container.innerHTML = shiftTypes.map((t, index) => `
+            container.innerHTML = shiftTypes.map((t) => `
                 <button 
-                    draggable="true"
-                    ondragstart="handleDragStart(event, ${index})"
-                    ondragover="handleDragOver(event)"
-                    ondrop="handleDrop(event, ${index})"
                     onclick="selectTool('${t.id}')" 
                     id="tool-${t.id}" 
-                    class="${t.color} px-2.5 py-1 rounded text-[10px] font-bold transition-all hover:brightness-95 border border-transparent draggable-tool shadow-sm">
+                    class="${t.color} px-2.5 py-1 rounded text-[10px] font-bold transition-all hover:brightness-95 border border-transparent shadow-sm">
                     ${t.label}
                 </button>
             `).join('');
             if (!selectedTool && shiftTypes.length > 0) selectTool(shiftTypes[0].id);
             else selectTool(selectedTool);
-        }
-
-        let dragSourceIndex = null;
-        function handleDragStart(e, index) {
-            dragSourceIndex = index;
-            e.dataTransfer.effectAllowed = 'move';
-        }
-        function handleDragOver(e) { e.preventDefault(); }
-        function handleDrop(e, targetIndex) {
-            e.preventDefault();
-            if (dragSourceIndex === targetIndex) return;
-            saveHistory();
-            const item = shiftTypes.splice(dragSourceIndex, 1)[0];
-            shiftTypes.splice(targetIndex, 0, item);
-            renderToolbar();
         }
 
         function selectTool(id) {
@@ -347,26 +398,48 @@
             });
         }
 
-        // --- 工具管理 ---
+        // --- 管理介面與排序 ---
+        let dragSourceIndex = null;
         function openToolManager() {
             const list = document.getElementById('toolManagerList');
-            list.innerHTML = shiftTypes.filter(t => !t.fixed).map((t, i) => `
-                <div class="flex items-center justify-between p-2 bg-slate-50 rounded border text-xs">
-                    <span class="flex items-center gap-2">
-                        <span class="w-3 h-3 rounded-full ${t.color.split(' ')[0]}"></span>
-                        ${t.label}
-                    </span>
-                    <button onclick="removeTool('${t.id}')" class="text-rose-500 hover:bg-rose-50 p-1 rounded">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                    </button>
+            list.innerHTML = shiftTypes.map((t, index) => `
+                <div class="flex items-center justify-between p-2 bg-white rounded border border-slate-200 text-xs drag-item"
+                     draggable="true"
+                     ondragstart="handleDragStart(event, ${index})"
+                     ondragover="handleDragOver(event)"
+                     ondrop="handleDrop(event, ${index})">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-300"></i>
+                        <span class="w-4 h-4 rounded-full ${t.color.split(' ')[0]} border border-slate-100"></span>
+                        <span class="font-medium text-slate-700">${t.label} ${t.fixed ? '<span class="text-[8px] text-slate-300 ml-1">(固定)</span>' : ''}</span>
+                    </div>
+                    ${!t.fixed ? `
+                        <button onclick="removeTool('${t.id}')" class="text-rose-400 hover:text-rose-600 hover:bg-rose-50 p-1 rounded transition">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </button>
+                    ` : '<div class="w-7"></div>'}
                 </div>
             `).join('');
             document.getElementById('toolManagerModal').classList.remove('hidden');
             lucide.createIcons();
         }
 
-        function closeToolManager() { document.getElementById('toolManagerModal').classList.add('hidden'); }
+        function handleDragStart(e, index) {
+            dragSourceIndex = index;
+            e.dataTransfer.effectAllowed = 'move';
+        }
+        function handleDragOver(e) { e.preventDefault(); }
+        function handleDrop(e, targetIndex) {
+            e.preventDefault();
+            if (dragSourceIndex === targetIndex) return;
+            saveHistory();
+            const item = shiftTypes.splice(dragSourceIndex, 1)[0];
+            shiftTypes.splice(targetIndex, 0, item);
+            renderToolbar();
+            openToolManager();
+        }
 
+        function closeToolManager() { document.getElementById('toolManagerModal').classList.add('hidden'); }
         function addNewTool() {
             const label = document.getElementById('newToolLabel').value.trim();
             const color = document.getElementById('newToolColor').value;
@@ -377,7 +450,6 @@
             renderToolbar();
             openToolManager();
         }
-
         function removeTool(id) {
             saveHistory();
             shiftTypes = shiftTypes.filter(t => t.id !== id);
@@ -386,7 +458,7 @@
             openToolManager();
         }
 
-        // --- 表格渲染 ---
+        // --- 表格渲染邏輯 ---
         function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
         function getWeather(date) {
             const month = date.getMonth();
@@ -418,7 +490,6 @@
             const weekNames = ["日", "一", "二", "三", "四", "五", "六"];
 
             document.getElementById('monthDisplay').innerText = `${currentYear}年 ${currentMonth + 1}月`;
-            // 更新標題名稱
             document.getElementById('tableTitle').innerText = `中清店-${currentMonth + 1}月 預排休假表`;
 
             let h_weather = `<tr class="bg-slate-50"><th colspan="2" class="sticky-col bg-slate-50 text-[9px] text-slate-300">天氣</th>`;
@@ -455,17 +526,17 @@
                         row += `<td rowspan="${g.members.length}" class="shift-group-col bg-slate-50 border-r border-slate-200">
                                     <div class="flex flex-col items-center justify-center h-full gap-1">
                                         <span>${g.group}</span>
-                                        <button onclick="addMember(${gIdx})" class="no-print bg-indigo-500 text-white rounded w-3 h-3 flex items-center justify-center hover:bg-indigo-600 shadow-sm transition">
+                                        ${isAdmin ? `<button onclick="addMember(${gIdx})" class="no-print bg-indigo-500 text-white rounded w-3 h-3 flex items-center justify-center hover:bg-indigo-600 shadow-sm transition">
                                             <i data-lucide="plus" class="w-2 h-2"></i>
-                                        </button>
+                                        </button>` : ''}
                                     </div>
                                 </td>`;
                     }
                     row += `<td class="sticky-col text-left font-medium px-1 flex items-center justify-between" style="left:28px; min-width:92px">
-                                <input type="text" value="${name}" class="name-input" onchange="updateMemberName(${gIdx}, ${mIdx}, this.value)">
-                                <button onclick="removeMember(${gIdx}, ${mIdx})" class="no-print text-slate-300 hover:text-rose-500">
+                                <input type="text" value="${name}" class="name-input" onchange="updateMemberName(${gIdx}, ${mIdx}, this.value)" ${!isAdmin ? 'readonly' : ''}>
+                                ${isAdmin ? `<button onclick="removeMember(${gIdx}, ${mIdx})" class="no-print text-slate-300 hover:text-rose-500">
                                     <i data-lucide="minus-circle" class="w-2.5 h-2.5"></i>
-                                </button>
+                                </button>` : ''}
                             </td>`;
                     
                     let personOffCount = 0;
@@ -510,9 +581,7 @@
             document.getElementById('holidayInput').value = holidayRemarks[dateStr] || "";
             document.getElementById('holidayModal').classList.remove('hidden');
         }
-
         function closeHolidayModal() { document.getElementById('holidayModal').classList.add('hidden'); }
-
         function saveHolidayRemark() {
             saveHistory();
             const val = document.getElementById('holidayInput').value.trim();
@@ -522,11 +591,10 @@
             renderMonthlyTable();
         }
 
-        // --- 排班操作與增減工具 ---
+        // --- 排班操作 ---
         function applyTool(dateStr, name, dayNum) {
             if (!schedule[dateStr]) schedule[dateStr] = {};
             const currentValue = schedule[dateStr][name] || "";
-
             if (selectedTool === "CLEAR") {
                 if (currentValue !== "") {
                     saveHistory();
@@ -562,18 +630,21 @@
             renderMonthlyTable();
         }
 
-        // --- 人員管理 ---
+        // --- 人員管理 (Admin Only) ---
         function addMember(gIdx) {
+            if(!isAdmin) return;
             saveHistory();
             staffGroups[gIdx].members.push("新人員");
             renderMonthlyTable();
         }
         function removeMember(gIdx, mIdx) {
+            if(!isAdmin) return;
             saveHistory();
             staffGroups[gIdx].members.splice(mIdx, 1);
             renderMonthlyTable();
         }
         function updateMemberName(gIdx, mIdx, newName) {
+            if(!isAdmin) return;
             saveHistory();
             const oldName = staffGroups[gIdx].members[mIdx];
             staffGroups[gIdx].members[mIdx] = newName;
