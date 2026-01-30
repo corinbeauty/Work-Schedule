@@ -22,9 +22,9 @@
         th, td { 
             border: 1px solid #e2e8f0; 
             text-align: center; 
-            padding: 0.4rem; 
-            font-size: 0.75rem;
-            min-width: 38px;
+            padding: 0.3rem 0.2rem; 
+            font-size: 0.7rem;
+            min-width: 34px;
         }
         .sticky-col {
             position: sticky;
@@ -32,7 +32,7 @@
             background: inherit;
             z-index: 10;
             border-right: 2px solid #cbd5e1;
-            min-width: 140px;
+            min-width: 120px;
         }
         .shift-group-col {
             position: sticky;
@@ -41,20 +41,22 @@
             font-weight: bold;
             writing-mode: vertical-rl;
             text-orientation: upright;
-            padding: 10px 4px;
+            padding: 2px;
+            font-size: 9px;
+            min-width: 28px !important;
+            width: 28px !important;
         }
         .weekend-text { color: #ef4444; font-weight: bold; }
         .holiday-bg { background-color: rgba(254, 226, 226, 0.4); }
         .cell-off { color: #ef4444; font-weight: bold; }
         .cell-resigned { background-color: #f1f5f9; color: #94a3b8; font-style: italic; }
-        .name-input { width: 80px; border: none; outline: none; background: transparent; }
+        .name-input { width: 70px; border: none; outline: none; background: transparent; font-size: 0.75rem; }
         .name-input:focus { background: rgba(255,255,255,0.5); border-radius: 4px; }
         
-        /* 班別色彩 */
-        .group-早班 { background-color: #fefce8; } /* 淺黃 */
-        .group-中班 { background-color: #f0fdf4; } /* 淺綠 */
-        .group-晚班 { background-color: #eff6ff; } /* 淺藍 */
-        .group-夜班 { background-color: #faf5ff; } /* 淺紫 */
+        .group-早班 { background-color: #fefce8; }
+        .group-中班 { background-color: #f0fdf4; }
+        .group-晚班 { background-color: #eff6ff; }
+        .group-夜班 { background-color: #faf5ff; }
 
         .active-tool { ring: 2px; ring-color: #4f46e5; transform: scale(1.05); }
         
@@ -74,39 +76,35 @@
 <body class="p-4">
 
     <div id="app" class="max-w-full mx-auto">
-        <header class="mb-6 flex flex-col md:flex-row justify-between items-end gap-4 no-print">
+        <header class="mb-4 flex flex-col md:flex-row justify-between items-end gap-4 no-print">
             <div class="flex items-end gap-6">
                 <div>
-                    <h1 id="tableTitle" class="text-2xl font-bold text-slate-800">月度預排休假表</h1>
-                    <div class="flex items-center gap-3 mt-2">
-                        <button onclick="changeMonth(-1)" class="p-1 hover:bg-slate-200 rounded"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-                        <span id="monthDisplay" class="font-medium text-slate-600">2026年 2月</span>
-                        <button onclick="changeMonth(1)" class="p-1 hover:bg-slate-200 rounded"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+                    <h1 id="tableTitle" class="text-xl font-bold text-slate-800">月度預排休假表</h1>
+                    <div class="flex items-center gap-2 mt-1">
+                        <button onclick="changeMonth(-1)" class="p-1 hover:bg-slate-200 rounded transition"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                        <span id="monthDisplay" class="font-medium text-slate-600 text-sm">2026年 2月</span>
+                        <button onclick="changeMonth(1)" class="p-1 hover:bg-slate-200 rounded transition"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
                     </div>
                 </div>
                 
-                <!-- 復原/重做 按鈕 -->
                 <div class="flex gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-                    <button onclick="undo()" id="undoBtn" class="p-1.5 text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-400 transition" title="復原 (Ctrl+Z)">
-                        <i data-lucide="undo-2" class="w-4 h-4"></i>
+                    <button onclick="undo()" id="undoBtn" class="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition" title="復原 (Ctrl+Z)">
+                        <i data-lucide="undo-2" class="w-3.5 h-3.5"></i>
                     </button>
-                    <button onclick="redo()" id="redoBtn" class="p-1.5 text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-400 transition" title="下一步 (Ctrl+Y)">
-                        <i data-lucide="redo-2" class="w-4 h-4"></i>
+                    <button onclick="redo()" id="redoBtn" class="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition" title="下一步 (Ctrl+Y)">
+                        <i data-lucide="redo-2" class="w-3.5 h-3.5"></i>
                     </button>
                 </div>
             </div>
 
-            <!-- 班次工具列選擇器 -->
-            <div class="bg-white p-2 rounded-xl shadow-sm border border-slate-200 flex gap-2 items-center">
-                <span class="text-xs font-bold text-slate-400 px-2">快速選擇：</span>
-                <div id="toolbar" class="flex gap-1">
-                    <!-- JS 動態生成 -->
-                </div>
+            <div class="bg-white p-1.5 rounded-lg shadow-sm border border-slate-200 flex gap-2 items-center">
+                <span class="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-wider">工具：</span>
+                <div id="toolbar" class="flex gap-1"></div>
             </div>
 
             <div class="flex gap-2">
-                <button onclick="window.print()" class="bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm hover:bg-slate-900 transition shadow-sm">
-                    <i data-lucide="printer" class="w-4 h-4"></i> 輸出日報表格式
+                <button onclick="window.print()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs hover:bg-slate-900 transition shadow-sm">
+                    <i data-lucide="printer" class="w-3 h-3"></i> 輸出日報表
                 </button>
             </div>
         </header>
@@ -119,22 +117,20 @@
             </table>
         </div>
 
-        <div class="mt-4 text-xs text-slate-400 no-print flex flex-wrap gap-4">
-            <span class="flex items-center gap-1"><i data-lucide="info" class="w-3 h-3"></i> 點擊工具列班次後，再點擊表格內容即可套用</span>
-            <span>● 點擊「+」可新增該班別人員</span>
-            <span>● 點擊姓名可修改</span>
-            <span>● 支援快捷鍵 Ctrl+Z 復原 / Ctrl+Y 重做</span>
+        <div class="mt-3 text-[10px] text-slate-400 no-print flex flex-wrap gap-4 uppercase tracking-tighter">
+            <span class="flex items-center gap-1"><i data-lucide="info" class="w-3 h-3"></i> 套用工具：點選上方工具後點擊表格</span>
+            <span>● 「初二/十六」自動依農曆標記</span>
+            <span>● 支援 Ctrl+Z/Y 快捷鍵</span>
         </div>
     </div>
 
-    <!-- 離職確認彈窗 -->
     <div id="resignModal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50 no-print">
-        <div class="bg-white p-6 rounded-xl shadow-xl w-80">
-            <h3 class="text-lg font-bold mb-2">離職狀態確認</h3>
-            <p id="resignText" class="text-sm text-slate-600 mb-6">是否將此人員從今日起至月底的所有日期皆標記為「離職」？</p>
+        <div class="bg-white p-5 rounded-xl shadow-xl w-72">
+            <h3 class="text-base font-bold mb-2">離職狀態確認</h3>
+            <p id="resignText" class="text-xs text-slate-600 mb-5">是否將此人員從今日起至月底一同標記？</p>
             <div class="flex justify-end gap-2">
-                <button onclick="handleResignConfirm(false)" class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm">僅今日</button>
-                <button onclick="handleResignConfirm(true)" class="px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-lg text-sm">後面日期一同標記</button>
+                <button onclick="handleResignConfirm(false)" class="px-3 py-1.5 text-slate-500 hover:bg-slate-100 rounded-lg text-[11px]">僅今日</button>
+                <button onclick="handleResignConfirm(true)" class="px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700 rounded-lg text-[11px]">後面全部標記</button>
             </div>
         </div>
     </div>
@@ -148,7 +144,6 @@
         let currentMonth = 1;
         let selectedTool = ""; 
 
-        // 歷史記錄棧
         let historyStack = [];
         let redoStack = [];
 
@@ -168,10 +163,26 @@
             { group: "夜班", members: ["黃品睿", "王楷翔", "施孟均"] }
         ];
 
-        const holidays = {
-            "2026-02-16": "除夕", "2026-02-17": "初一", "2026-02-18": "初二",
-            "2026-02-19": "初三", "2026-02-20": "初四", "2026-02-21": "初五",
-            "2026-02-28": "228紀念日"
+        // 台灣 2026 國定假日 + 農曆初二、十六 (作牙/拜拜)
+        const taiwanHolidays = {
+            "2026-01-01": "元旦",
+            "2026-01-20": "初二", // 臘月
+            "2026-02-03": "十六", // 臘月
+            "2026-02-16": "除夕", "2026-02-17": "初一", "2026-02-18": "初二", "2026-02-19": "初三", "2026-02-20": "初四", "2026-02-21": "初五",
+            "2026-02-28": "228紀念日",
+            "2026-03-04": "十六",
+            "2026-03-20": "初二",
+            "2026-04-03": "十六/清明", "2026-04-04": "清明節",
+            "2026-04-18": "初二",
+            "2026-05-01": "勞動節", "2026-05-02": "十六",
+            "2026-05-17": "初二", "2026-05-31": "十六",
+            "2026-06-16": "初二", "2026-06-19": "端午節", "2026-06-30": "十六",
+            "2026-07-15": "初二", "2026-07-29": "十六",
+            "2026-08-14": "初二", "2026-08-28": "十六",
+            "2026-09-12": "初二", "2026-09-25": "中秋節", "2026-09-26": "十六",
+            "2026-10-10": "國慶日", "2026-10-12": "初二", "2026-10-26": "十六",
+            "2026-11-10": "初二", "2026-11-24": "十六",
+            "2026-12-10": "初二", "2026-12-24": "十六"
         };
 
         let schedule = {};
@@ -183,7 +194,6 @@
             updateHistoryButtons();
             lucide.createIcons();
             
-            // 監聽快捷鍵
             window.addEventListener('keydown', (e) => {
                 if (e.ctrlKey || e.metaKey) {
                     if (e.key === 'z') { e.preventDefault(); undo(); }
@@ -192,14 +202,13 @@
             });
         }
 
-        // --- 歷史記錄核心 ---
         function saveHistory() {
             historyStack.push({
                 schedule: JSON.parse(JSON.stringify(schedule)),
                 staffGroups: JSON.parse(JSON.stringify(staffGroups))
             });
-            redoStack = []; // 有新動作時清空重做棧
-            if (historyStack.length > 50) historyStack.shift(); // 限制 50 步
+            redoStack = [];
+            if (historyStack.length > 50) historyStack.shift();
             updateHistoryButtons();
         }
 
@@ -234,19 +243,13 @@
             const rBtn = document.getElementById('redoBtn');
             uBtn.disabled = historyStack.length === 0;
             rBtn.disabled = redoStack.length === 0;
-            
-            uBtn.classList.toggle('text-slate-400', uBtn.disabled);
-            uBtn.classList.toggle('text-indigo-600', !uBtn.disabled);
-            rBtn.classList.toggle('text-slate-400', rBtn.disabled);
-            rBtn.classList.toggle('text-indigo-600', !rBtn.disabled);
         }
 
-        // --- 介面渲染 ---
         function renderToolbar() {
             const container = document.getElementById('toolbar');
             container.innerHTML = shiftTypes.map(t => `
                 <button onclick="selectTool('${t.id}')" id="tool-${t.id}" 
-                        class="${t.color} px-3 py-1 rounded-lg text-xs font-bold transition-all hover:brightness-95 border border-transparent">
+                        class="${t.color} px-2.5 py-1 rounded text-[10px] font-bold transition-all hover:brightness-95 border border-transparent">
                     ${t.label || '空'}
                 </button>
             `).join('');
@@ -257,11 +260,8 @@
             selectedTool = id;
             shiftTypes.forEach(t => {
                 const btn = document.getElementById(`tool-${t.id}`);
-                if (t.id === id) {
-                    btn.classList.add('ring-2', 'ring-indigo-500', 'border-white', 'shadow-sm');
-                } else {
-                    btn.classList.remove('ring-2', 'ring-indigo-500', 'border-white', 'shadow-sm');
-                }
+                if (t.id === id) btn.classList.add('ring-2', 'ring-indigo-500', 'border-white');
+                else btn.classList.remove('ring-2', 'ring-indigo-500', 'border-white');
             });
         }
 
@@ -298,29 +298,28 @@
             const foot = document.getElementById('tableFoot');
             const weekNames = ["日", "一", "二", "三", "四", "五", "六"];
 
-            document.getElementById('tableTitle').innerText = `${currentMonth + 1}月 預排休假表`;
             document.getElementById('monthDisplay').innerText = `${currentYear}年 ${currentMonth + 1}月`;
 
-            let h_weather = `<tr class="bg-slate-50"><th colspan="2" class="sticky-col bg-slate-50 text-[10px] text-slate-400">天氣</th>`;
+            let h_weather = `<tr class="bg-slate-50"><th colspan="2" class="sticky-col bg-slate-50 text-[9px] text-slate-300">天氣</th>`;
             let h1 = `<tr class="bg-slate-50"><th colspan="2" class="sticky-col bg-slate-50">節慶</th>`;
-            let h2 = `<tr><th class="sticky-col">班別</th><th class="sticky-col" style="left:40px">姓名/星期</th>`;
+            let h2 = `<tr><th class="sticky-col" style="min-width:28px">班別</th><th class="sticky-col" style="left:28px">姓名</th>`;
             let h3 = `<tr><th colspan="2" class="sticky-col"></th>`;
 
             for (let d = 1; d <= daysCount; d++) {
                 let date = new Date(currentYear, currentMonth, d);
                 let dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                let isHoliday = holidays[dateStr] || false;
+                let holidayName = taiwanHolidays[dateStr] || "";
                 let isWeekend = (date.getDay() === 0 || date.getDay() === 6);
-                let colorClass = (isHoliday || isWeekend) ? "weekend-text" : "";
+                let colorClass = (holidayName !== "" || isWeekend) ? "weekend-text" : "";
                 const weather = getWeather(date);
 
-                h_weather += `<th class="${weather.color} font-bold text-[10px]">${weather.label}</th>`;
-                h1 += `<th class="${colorClass} text-[10px]">${holidays[dateStr] || ""}</th>`;
+                h_weather += `<th class="${weather.color} font-bold text-[9px]">${weather.label}</th>`;
+                h1 += `<th class="${colorClass} text-[9px] leading-tight">${holidayName}</th>`;
                 h2 += `<th class="${colorClass}">${d}</th>`;
-                h3 += `<th class="${colorClass}">${weekNames[date.getDay()]}</th>`;
+                h3 += `<th class="${colorClass} text-[9px]">${weekNames[date.getDay()]}</th>`;
             }
             h_weather += `<th class="bg-slate-100"></th></tr>`;
-            h1 += `<th rowspan="3" class="w-12 bg-slate-100">共休</th></tr>`;
+            h1 += `<th rowspan="3" class="w-10 bg-slate-100 text-[9px]">共休</th></tr>`;
             head.innerHTML = h_weather + h1 + h2 + h3;
 
             let bodyHtml = "";
@@ -329,34 +328,33 @@
                 g.members.forEach((name, mIdx) => {
                     let row = `<tr class="${groupClass}">`;
                     if (mIdx === 0) {
-                        row += `<td rowspan="${g.members.length}" class="shift-group-col bg-slate-50 border-r-2 border-slate-200">
-                                    <div class="flex flex-col items-center gap-1.5">
-                                        <span class="text-[11px] mb-0.5">${g.group}</span>
-                                        <button onclick="addMember(${gIdx})" class="no-print bg-indigo-500 text-white rounded-full p-0.5 hover:bg-indigo-600 shadow-sm">
-                                            <i data-lucide="plus" class="w-2.5 h-2.5"></i>
+                        row += `<td rowspan="${g.members.length}" class="shift-group-col bg-slate-50 border-r border-slate-200">
+                                    <div class="flex flex-col items-center justify-center h-full gap-1">
+                                        <span>${g.group}</span>
+                                        <button onclick="addMember(${gIdx})" class="no-print bg-indigo-500 text-white rounded w-3 h-3 flex items-center justify-center hover:bg-indigo-600 shadow-sm">
+                                            <i data-lucide="plus" class="w-2 h-2"></i>
                                         </button>
                                     </div>
                                 </td>`;
                     }
-                    row += `<td class="sticky-col text-left font-medium px-2 flex items-center justify-between" style="left:40px">
+                    row += `<td class="sticky-col text-left font-medium px-1 flex items-center justify-between" style="left:28px; min-width:92px">
                                 <input type="text" value="${name}" class="name-input" onchange="updateMemberName(${gIdx}, ${mIdx}, this.value)">
-                                <button onclick="removeMember(${gIdx}, ${mIdx})" class="no-print text-slate-400/50 hover:text-rose-500">
-                                    <i data-lucide="minus-circle" class="w-3 h-3"></i>
+                                <button onclick="removeMember(${gIdx}, ${mIdx})" class="no-print text-slate-300 hover:text-rose-500">
+                                    <i data-lucide="minus-circle" class="w-2.5 h-2.5"></i>
                                 </button>
                             </td>`;
                     
                     let personOffCount = 0;
                     for (let d = 1; d <= daysCount; d++) {
-                        let date = new Date(currentYear, currentMonth, d);
                         let dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                         let value = (schedule[dateStr] && schedule[dateStr][name]) ? schedule[dateStr][name] : "";
-                        let isWeekend = (date.getDay() === 0 || date.getDay() === 6);
+                        let isWeekend = (new Date(currentYear, currentMonth, d).getDay() === 0 || new Date(currentYear, currentMonth, d).getDay() === 6);
                         
                         let cellClass = "";
                         if (value === "休") { cellClass = "cell-off"; personOffCount++; }
-                        if (value === "離職") { cellClass = "cell-resigned"; }
+                        if (value === "離職") cellClass = "cell-resigned";
                         
-                        row += `<td class="cursor-pointer hover:bg-white/60 transition ${cellClass} ${isWeekend && value !== '離職'?'holiday-bg':''}" 
+                        row += `<td class="cursor-pointer hover:bg-white/50 transition ${cellClass} ${isWeekend && value !== '離職'?'holiday-bg':''}" 
                                     onclick="applyTool('${dateStr}', '${name}', ${d})">${value}</td>`;
                     }
                     row += `<td class="font-bold bg-slate-50/50">${personOffCount}</td></tr>`;
@@ -365,14 +363,14 @@
             });
             body.innerHTML = bodyHtml;
 
-            let footHtml = `<tr class="bg-slate-100 font-bold"><td colspan="2" class="sticky-col bg-slate-100">每日休假人數</td>`;
+            let footHtml = `<tr class="bg-slate-100 font-bold"><td colspan="2" class="sticky-col bg-slate-100 text-[9px]">休假統計</td>`;
             for (let d = 1; d <= daysCount; d++) {
                 let dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                 let count = 0;
                 if (schedule[dateStr]) {
                     Object.values(schedule[dateStr]).forEach(v => { if (v === "休") count++; });
                 }
-                footHtml += `<td>${count || ""}</td>`;
+                footHtml += `<td class="text-rose-600">${count || ""}</td>`;
             }
             footHtml += `<td></td></tr>`;
             foot.innerHTML = footHtml;
@@ -381,7 +379,6 @@
             updatePrintReport();
         }
 
-        // --- 功能操作與歷史保存 ---
         function addMember(gIdx) {
             saveHistory();
             staffGroups[gIdx].members.push("新人員");
@@ -409,17 +406,14 @@
 
         function applyTool(dateStr, name, dayNum) {
             if (!schedule[dateStr]) schedule[dateStr] = {};
-            
             if (selectedTool === "離職") {
                 resignContext = { dateStr, name, dayNum };
-                document.getElementById('resignText').innerText = `是否將 ${name} 從 ${dateStr} 之後的所有日期皆標記為「離職」？`;
+                document.getElementById('resignText').innerText = `是否將 ${name} 從 ${dateStr} 之後一同標記？`;
                 document.getElementById('resignModal').classList.remove('hidden');
-            } else {
-                if (schedule[dateStr][name] !== selectedTool) {
-                    saveHistory();
-                    schedule[dateStr][name] = selectedTool;
-                    renderMonthlyTable();
-                }
+            } else if (schedule[dateStr][name] !== selectedTool) {
+                saveHistory();
+                schedule[dateStr][name] = selectedTool;
+                renderMonthlyTable();
             }
         }
 
@@ -427,17 +421,13 @@
             saveHistory();
             const { dateStr, name, dayNum } = resignContext;
             const daysCount = getDaysInMonth(currentYear, currentMonth);
-
             if (applyToFuture) {
                 for (let d = dayNum; d <= daysCount; d++) {
                     let dStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                     if (!schedule[dStr]) schedule[dStr] = {};
                     schedule[dStr][name] = "離職";
                 }
-            } else {
-                schedule[dateStr][name] = "離職";
-            }
-
+            } else schedule[dateStr][name] = "離職";
             document.getElementById('resignModal').classList.add('hidden');
             resignContext = null;
             renderMonthlyTable();
@@ -447,47 +437,19 @@
             const container = document.getElementById('reportGrid');
             container.innerHTML = '';
             const daysCount = getDaysInMonth(currentYear, currentMonth);
-
             for (let d = 1; d <= daysCount; d++) {
                 let date = new Date(currentYear, currentMonth, d);
                 let dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                 let dayData = schedule[dateStr] || {};
-
                 const getWorking = (group) => {
                     const g = staffGroups.find(g => g.group === group);
-                    if (!g) return [];
-                    return g.members.filter(m => dayData[m] && dayData[m] !== '休' && dayData[m] !== '離職' && m !== '待補');
+                    return g ? g.members.filter(m => dayData[m] && dayData[m] !== '休' && dayData[m] !== '離職' && m !== '待補') : [];
                 };
-
-                const morning = getWorking("早班");
-                const afternoon = getWorking("中班");
-                const evening = getWorking("晚班");
+                const morning = getWorking("早班"), afternoon = getWorking("中班"), evening = getWorking("晚班");
                 const holidaysList = Object.keys(dayData).filter(m => dayData[m] === '休');
-
-                let block = `
-                    <div class="day-block">
-                        <div class="font-bold text-center border-b border-black pb-1">
-                            ${currentMonth+1}/${d} (${["週日","週一","週二","週三","週四","週五","週六"][date.getDay()]})
-                        </div>
-                        <table class="report-table text-[9px]">
-                            <tr class="bg-gray-100 font-bold">
-                                <td width="15%">班別</td><td width="35%">人力安排</td><td width="14%">崗位</td>
-                                <td width="12%">08~16</td><td width="12%">16~00</td><td width="12%">00~08</td>
-                            </tr>
-                            <tr><td>早班</td><td>${morning.join('、')}</td><td></td><td>${morning.length || ''}</td><td></td><td></td></tr>
-                            <tr><td>中班</td><td>${afternoon.join('、')}</td><td></td><td></td><td>${afternoon.length || ''}</td><td></td></tr>
-                            <tr><td>晚班</td><td>${evening.join('、')}</td><td></td><td></td><td></td><td>${evening.length || ''}</td></tr>
-                            ${'<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>'.repeat(2)}
-                        </table>
-                        <div class="mt-2 text-[9px]">
-                            <div>休假人員：${holidaysList.join('、') || '無'}</div>
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += block;
+                container.innerHTML += `<div class="day-block"><div class="font-bold text-center border-b border-black pb-1">${currentMonth+1}/${d} (${["週日","週一","週二","週三","週四","週五","週六"][date.getDay()]})</div><table class="report-table text-[9px]"><tr class="bg-gray-100 font-bold"><td width="15%">班別</td><td width="35%">人力安排</td><td width="14%">崗位</td><td width="12%">08~16</td><td width="12%">16~00</td><td width="12%">00~08</td></tr><tr><td>早班</td><td>${morning.join('、')}</td><td></td><td>${morning.length || ''}</td><td></td><td></td></tr><tr><td>中班</td><td>${afternoon.join('、')}</td><td></td><td></td><td>${afternoon.length || ''}</td><td></td></tr><tr><td>晚班</td><td>${evening.join('、')}</td><td></td><td></td><td></td><td>${evening.length || ''}</td></tr>${'<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>'.repeat(2)}</table><div class="mt-2 text-[9px]"><div>休假人員：${holidaysList.join('、') || '無'}</div></div></div>`;
             }
         }
-
         window.onload = init;
     </script>
 </body>
