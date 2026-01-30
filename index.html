@@ -13,7 +13,10 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- 請將您的 Firebase Config 貼在這裡 ---
         const firebaseConfig = JSON.parse(__firebase_config); 
+        // ----------------------------------------
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -22,6 +25,7 @@
         window.db = db; window.auth = auth; window.appId = appId;
         window.fbDoc = doc; window.fbSetDoc = setDoc; window.fbGetDoc = getDoc; window.fbCollection = collection;
 
+        // 規則 3: 確保認證與載入順序
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -29,13 +33,20 @@
                 } else {
                     await signInAnonymously(auth);
                 }
-            } catch (err) { console.error("Auth Fail:", err); }
+            } catch (err) {
+                console.error("Auth Fail:", err);
+                document.getElementById('syncText').innerText = "連線失敗：請檢查規則";
+            }
         };
 
         onAuthStateChanged(auth, (user) => {
-            if (user) { window.loadGlobalState(); }
-            else { window.renderMonthlyTable(); } // 沒登入也先畫出表格
+            if (user) {
+                window.loadGlobalState(); 
+            } else {
+                window.renderMonthlyTable(); 
+            }
         });
+
         initAuth();
     </script>
 
@@ -44,21 +55,20 @@
         
         body { font-family: 'Inter', 'Microsoft JhengHei', sans-serif; background-color: #f8fafc; font-size: 0.65rem; touch-action: manipulation; }
         
-        /* 修正手機端滾動與高度 */
         .table-wrapper { 
             overflow: auto; 
             background: white; 
             border-radius: 0.5rem; 
             box-shadow: 0 4px 20px -5px rgb(0 0 0 / 0.1);
             -webkit-overflow-scrolling: touch; 
-            min-height: 300px;
+            min-height: 250px;
             width: 100%;
         }
         
         table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
         th, td { border: 1px solid #e2e8f0; text-align: center; padding: 0.25rem 0.1rem; font-size: 0.65rem; width: 34px; min-width: 34px; }
         
-        /* 固定欄位 */
+        /* 固定欄位設定 */
         .shift-group-col { position: sticky; left: 0; z-index: 40; background: #f8fafc; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; width: 26px !important; min-width: 26px !important; border-right: 1px solid #cbd5e1; }
         .name-col-sticky { position: sticky; left: 26px; z-index: 39; border-right: 2px solid #cbd5e1; width: 100px !important; min-width: 100px !important; }
 
@@ -71,7 +81,6 @@
         .weekend-text { color: #ef4444; font-weight: 800; }
         .holiday-bg { background-color: rgba(254, 226, 226, 0.4); }
         
-        /* 選取工具效果 */
         .active-tool { 
             outline: 2px solid #4f46e5 !important; 
             outline-offset: 1px;
@@ -80,26 +89,23 @@
             box-shadow: 0 4px 10px -2px rgba(79, 70, 229, 0.4) !important;
         }
         
-        /* 姓名維持原大小 0.75rem */
+        /* 姓名保留原本大小 */
         .name-input { width: 85px; border: none; outline: none; background: transparent; font-size: 0.75rem; text-align: center; font-weight: 800; color: #1e293b; }
         
-        /* 彈窗 */
-        .modal-overlay { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(2px); z-index: 100; }
+        .modal-overlay { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 100; }
         .draggable-handle { cursor: move; touch-action: none; }
 
         .admin-only { display: none !important; }
         body.is-admin .admin-only { display: flex !important; }
         
         .staff-count-box { font-size: 7px; line-height: 1.3; display: flex; flex-direction: column; padding: 1px; }
-        .staff-count-input { width: 25px; border-bottom: 1px solid #cbd5e1; text-align: center; font-weight: bold; background: rgba(0,0,0,0.05); outline: none; }
+        .staff-count-input { width: 25px; border-bottom: 1px solid #cbd5e1; text-align: center; font-weight: bold; background: rgba(0,0,0,0.05); outline: none; border-radius: 2px; }
 
         #syncBadge { position: fixed; bottom: 15px; right: 15px; z-index: 200; display: none; }
-        .badge-success { background-color: #10b981 !important; }
+        .badge-success { background-color: #10b981 !important; border-color: #059669 !important; }
 
-        /* 手機標頭優化 */
         @media (max-width: 640px) {
-            header { flex-direction: column; align-items: flex-start !important; }
-            .header-group { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+            header { flex-direction: column; align-items: flex-start !important; gap: 0.5rem; }
         }
     </style>
 </head>
@@ -129,7 +135,7 @@
                             <span class="text-[8px] font-bold text-slate-400 uppercase tracking-widest px-0.5">快速選取</span>
                             <button onclick="openToolManager()" class="admin-only text-[8px] text-indigo-600 font-black flex items-center">管理</button>
                         </div>
-                        <div id="toolbar" class="flex gap-1 items-center"></div>
+                        <div id="toolbar" class="flex gap-1.5 items-center"></div>
                     </div>
                     <div class="bg-white p-1 rounded-xl shadow-sm border border-slate-200 flex gap-1 items-center">
                         <span class="text-[8px] font-bold text-slate-400 px-1">休假概況</span>
@@ -137,7 +143,7 @@
                     </div>
                     <div class="flex gap-1 ml-auto">
                         <div class="admin-only">
-                            <button onclick="openVacationModal()" class="bg-indigo-600 text-white px-2 py-1 rounded-lg flex items-center gap-1 text-[9px] font-black shadow-sm"><i data-lucide="shield" class="w-3 h-3"></i> 管理者</button>
+                            <button onclick="openVacationModal()" class="bg-indigo-600 text-white px-2 py-1 rounded-lg flex items-center gap-1 text-[9px] font-black shadow-sm"><i data-lucide="shield" class="w-3 h-3 text-white"></i> 管理員</button>
                         </div>
                         <button onclick="toggleAdmin()" class="p-1.5 text-slate-400 bg-white border border-slate-200 rounded-lg shadow-sm transition"><i data-lucide="lock" id="adminIcon" class="w-3.5 h-3.5"></i></button>
                     </div>
@@ -155,20 +161,20 @@
 
         <footer class="mt-3 text-[8px] text-slate-400 no-print flex justify-between items-center bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
             <div class="flex gap-3 items-center">
-                <span class="font-black text-emerald-600"><i data-lucide="check-circle" class="w-2.5 h-2.5 inline"></i> 已連線雲端</span>
-                <span class="admin-only font-black text-indigo-600">管理模式</span>
+                <span class="font-black text-emerald-600"><i data-lucide="check-circle" class="w-2.5 h-2.5 inline"></i> 雲端連線正常</span>
+                <span class="admin-only font-black text-indigo-600">管理者模式</span>
             </div>
             <div class="flex gap-2 items-center">
-                <span>© 原點數位科技</span>
+                <span>© 原點數位科技 2026</span>
                 <div class="flex gap-1 font-mono font-bold">
                     <span id="versionLabel" class="bg-slate-50 px-1.5 py-0.5 rounded">v26.1.30.22</span>
-                    <span id="modifyTime" class="bg-slate-50 px-1.5 py-0.5 rounded tracking-tighter">等待同步...</span>
+                    <span id="modifyTime" class="bg-slate-50 px-1.5 py-0.5 rounded tracking-tighter">載入中...</span>
                 </div>
             </div>
         </footer>
     </div>
 
-    <!-- 其餘 Modal 內容維持功能不變 -->
+    <!-- 管理者與設定 Modal -->
     <div id="vacationModal" class="bg-white rounded-xl shadow-2xl w-[560px] hidden no-print overflow-hidden border border-slate-200 fixed border-t-4 border-indigo-600">
         <div class="modal-header bg-slate-900 p-3 flex items-center justify-between text-white draggable-handle" id="vacationModalHeader">
             <h3 class="text-xs font-black flex items-center gap-2"><i data-lucide="command" class="w-4 h-4"></i> 管理者專區</h3>
@@ -190,13 +196,12 @@
         </div>
     </div>
 
-    <!-- 登入 Modal -->
     <div id="loginModal" class="fixed inset-0 modal-overlay hidden flex items-center justify-center no-print">
         <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-72 text-center border border-slate-100">
-            <h3 class="text-lg font-black mb-4">管理員登入</h3>
-            <input type="password" id="adminPassword" class="w-full border rounded-xl px-4 py-3 text-center mb-6 focus:border-indigo-500 outline-none font-black" maxlength="4" placeholder="密碼">
-            <button onclick="verifyPassword()" class="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold transition">確定</button>
-            <button onclick="closeLogin()" class="w-full py-2 text-slate-400 text-[10px] mt-1">取消</button>
+            <h3 class="text-lg font-black mb-4 uppercase tracking-widest text-slate-800">管理者登入</h3>
+            <input type="password" id="adminPassword" class="w-full border-2 border-slate-100 rounded-xl px-4 py-3 text-center mb-6 focus:border-indigo-500 outline-none font-black text-xl" maxlength="4" placeholder="••••">
+            <button onclick="verifyPassword()" class="w-full py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold transition">確定解鎖</button>
+            <button onclick="closeLogin()" class="w-full py-2 text-slate-400 text-[10px] mt-1 font-bold">取消</button>
         </div>
     </div>
 
@@ -220,68 +225,85 @@
 
         function init() { 
             renderToolbar(); 
-            renderMonthlyTable(); // 啟動時先做第一次渲染
+            renderMonthlyTable(); 
             makeDraggable(document.getElementById('vacationModal'), document.getElementById('vacationModalHeader')); 
             lucide.createIcons(); 
         }
 
+        // --- 核心：雲端同步 ---
         window.loadGlobalState = async () => {
             if(!window.auth.currentUser) return;
             const appId = window.appId;
             try {
-                const path = (c) => ['artifacts', appId, 'public', 'data', c, 'current'];
+                // 使用嚴格 6 段式路徑規則修正
+                const getRef = (c) => window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', c, 'current');
+                
                 const [sS, pS, hS, lS, tS] = await Promise.all([
-                    window.fbGetDoc(window.fbDoc(window.db, ...path('main_schedule'))),
-                    window.fbGetDoc(window.fbDoc(window.db, ...path('personnel_config'))),
-                    window.fbGetDoc(window.fbDoc(window.db, ...path('holiday_remarks'))),
-                    window.fbGetDoc(window.fbDoc(window.db, ...path('logic'))),
-                    window.fbGetDoc(window.fbDoc(window.db, ...path('toolbar_settings')))
+                    window.fbGetDoc(getRef('main_schedule')),
+                    window.fbGetDoc(getRef('personnel_config')),
+                    window.fbGetDoc(getRef('holiday_remarks')),
+                    window.fbGetDoc(getRef('logic')),
+                    window.fbGetDoc(getRef('toolbar_settings'))
                 ]);
-                if(sS.exists()) schedule = sS.data().schedule || {};
-                if(pS.exists()) { staffGroups = pS.data().staffGroups; requiredStaffCount = pS.data().requiredStaffCount; document.getElementById('leaveSummary').value = pS.data().leaveSummary; }
-                if(hS.exists()) holidayRemarks = hS.data().holidayRemarks || hS.data().remarks || {};
-                if(lS.exists()) shiftLogic = lS.data().data || [];
-                if(tS.exists()) shiftTypes = tS.data().data;
 
+                if(sS.exists()) schedule = sS.data().schedule || {};
+                if(pS.exists()) { 
+                    staffGroups = pS.data().staffGroups || staffGroups; 
+                    requiredStaffCount = pS.data().requiredStaffCount || 15; 
+                    document.getElementById('leaveSummary').value = pS.data().leaveSummary || "4例4休6國"; 
+                }
+                if(hS.exists()) holidayRemarks = hS.data().remarks || hS.data().holidayRemarks || {};
+                if(lS.exists()) shiftLogic = lS.data().data || [];
+                if(tS.exists() && tS.data().data?.length > 0) shiftTypes = tS.data().data;
+
+                updateVersionFooter();
                 renderToolbar();
                 renderMonthlyTable();
-                updateVersionFooter();
+                lucide.createIcons();
             } catch(e) { 
-                console.error("Firebase Stuck", e);
-                document.getElementById('syncText').innerText = "雲端讀取失敗";
+                console.error("Firebase Sync Error:", e);
+                document.getElementById('syncText').innerText = "連線失敗：請檢查規則";
             }
         };
 
         function updateVersionFooter() {
             const now = new Date();
             const h = String(now.getHours()).padStart(2, '0');
-            document.getElementById('modifyTime').innerText = `${now.toLocaleTimeString()}`;
-            document.getElementById('versionLabel').innerText = `v26.1.30.${h}`;
+            document.getElementById('modifyTime').innerText = `同步：${now.toLocaleTimeString()}`;
+            document.getElementById('versionLabel').innerText = `版本：v26.1.31.${h}`;
         }
 
         function triggerAutoSave() {
             if(saveTimeout) clearTimeout(saveTimeout);
-            const b = document.getElementById('syncBadge');
-            b.style.display = 'flex'; b.classList.remove('badge-success');
+            const badge = document.getElementById('syncBadge');
+            badge.style.display = 'flex'; badge.classList.remove('badge-success');
             document.getElementById('syncText').innerText = "雲端同步中...";
+            document.getElementById('syncIcon').innerHTML = '<i data-lucide="refresh-cw" class="w-3 h-3 animate-spin text-indigo-400"></i>';
+            lucide.createIcons();
+            
             saveTimeout = setTimeout(async () => {
                 try {
                     await performCloudSave();
-                    b.classList.add('badge-success'); document.getElementById('syncText').innerText = "同步完成";
-                    setTimeout(() => { b.style.display = 'none'; }, 1000);
+                    badge.classList.add('badge-success'); document.getElementById('syncText').innerText = "同步完成";
+                    document.getElementById('syncIcon').innerHTML = '<i data-lucide="check" class="w-3 h-3 text-white"></i>';
+                    lucide.createIcons();
+                    setTimeout(() => { badge.style.display = 'none'; }, 1000);
                 } catch(e) { document.getElementById('syncText').innerText = "失敗"; }
-            }, 500);
+            }, 500); 
         }
 
         async function performCloudSave() {
             if(!window.auth.currentUser) return;
-            const path = (c) => ['artifacts', window.appId, 'public', 'data', c, 'current'];
-            await Promise.all([
-                window.fbSetDoc(window.fbDoc(window.db, ...path('main_schedule')), { schedule }),
-                window.fbSetDoc(window.fbDoc(window.db, ...path('personnel_config')), { staffGroups, requiredStaffCount, leaveSummary: document.getElementById('leaveSummary').value }),
-                window.fbSetDoc(window.fbDoc(window.db, ...path('holiday_remarks')), { holidayRemarks })
-            ]);
-            updateVersionFooter();
+            const appId = window.appId;
+            const setRef = (c) => window.fbDoc(window.db, 'artifacts', appId, 'public', 'data', c, 'current');
+            try {
+                await Promise.all([
+                    window.fbSetDoc(setRef('main_schedule'), { schedule }),
+                    window.fbSetDoc(setRef('personnel_config'), { staffGroups, requiredStaffCount, leaveSummary: document.getElementById('leaveSummary').value }),
+                    window.fbSetDoc(setRef('holiday_remarks'), { holidayRemarks })
+                ]);
+                updateVersionFooter();
+            } catch(e) { throw e; }
         }
 
         function renderMonthlyTable() {
@@ -291,69 +313,82 @@
             const shortfall = Math.max(0, requiredStaffCount - totalS);
             const getWeather = (date) => { const m = date.getMonth(), d = date.getDate(), s = (m * 31 + d) % 10; return m <= 2 || m >= 10 ? (s < 3 ? {label:"雨",color:"text-blue-400"} : s < 7 ? {label:"冷",color:"text-indigo-500"} : {label:"暖",color:"text-orange-400"}) : (s < 2 ? {label:"雨",color:"text-blue-400"} : s < 8 ? {label:"晴",color:"text-amber-500"} : {label:"暖",color:"text-rose-500"}); };
 
-            let hW = `<tr class="bg-slate-50"><th rowspan="4" class="shift-group-col">班別</th><th rowspan="4" class="name-col-sticky bg-slate-50"><div class="staff-count-box"><b>人力編制</b><div class="flex justify-between px-1"><span>應有</span><input value="${requiredStaffCount}" class="staff-count-input" onchange="updateRequiredStaff(this.value)" ${!isAdmin?'readonly':''}></div><div class="flex justify-between px-1"><span>現有</span><b>${totalS}</b></div><div class="flex justify-between px-1"><span>待補</span><b class="${shortfall>0?'text-rose-500':''}">${shortfall}</b></div></div></th><th class="text-[7px] border-b text-slate-400">天氣</th>`;
-            let hF = `<tr class="bg-slate-50"><th class="text-[7px] border-b text-rose-500 font-black">節慶</th>`;
-            let hK = `<tr class="bg-slate-50"><th class="text-[7px] border-b text-slate-400">星期</th>`;
-            let h2 = `<tr class="bg-slate-100"><th class="text-[8px] border-b-2 font-black">日期</th>`;
+            let hW = `<tr class="bg-slate-50"><th rowspan="4" class="shift-group-col border-b-2">班別</th><th rowspan="4" class="name-col-sticky border-b-2 bg-slate-50">
+                <div class="staff-count-box w-full">
+                    <div class="font-black text-[8px] text-indigo-900 border-b border-indigo-100 pb-0.5 text-center">人力編制</div>
+                    <div class="flex justify-between items-center px-0.5 font-bold"><span>應有</span><input value="${requiredStaffCount}" class="staff-count-input" onchange="updateRequiredStaff(this.value)" ${!isAdmin?'readonly':''}></div>
+                    <div class="flex justify-between items-center px-0.5 font-bold"><span>現有</span><span class="text-indigo-600">${totalS}</span></div>
+                    <div class="flex justify-between items-center px-0.5 font-bold"><span>待補</span><span class="${shortfall > 0 ? 'text-rose-500' : 'text-slate-300'}">${shortfall}</span></div>
+                </div>
+            </th><th class="bg-slate-50 text-[7px] text-slate-400 border-b">天氣</th>`;
+            let hF = `<tr class="bg-slate-50"><th class="bg-slate-50 text-[7px] text-rose-500 font-black border-b">節慶</th>`;
+            let hK = `<tr class="bg-slate-50"><th class="bg-slate-50 text-[7px] text-slate-400 border-b">星期</th>`;
+            let h2 = `<tr class="bg-slate-100"><th class="border-b-2 font-bold text-[7px]">日期</th>`;
             
             for(let d=1; d<=daysCount; d++) {
                 let date=new Date(currentYear,currentMonth,d), ds=getSafeDateStr(currentYear, currentMonth, d), isW=(date.getDay()===0||date.getDay()===6), w = getWeather(date);
-                hW += `<th class="${w.color} font-black text-[7px] border-b">${w.label}</th>`;
-                hF += `<th class="weekend-text text-[7px] border-b" onclick="openHolidayModal('${ds}')">${holidayRemarks[ds] || TW_HOLIDAYS_2026[ds] || LUNAR_EVENTS_2026[ds] || ''}</th>`;
-                hK += `<th class="${isW?'weekend-text':''} text-[7px] border-b opacity-50">${["日","一","二","三","四","五","六"][date.getDay()]}</th>`;
-                h2 += `<th class="${isW?'weekend-text':''} border-b-2 font-black text-[9px]">${d}</th>`;
+                let fest = holidayRemarks[ds] || TW_HOLIDAYS_2026[ds] || LUNAR_EVENTS_2026[ds] || '';
+                hW += `<th class="${w.color} font-bold text-[7px] border-b">${w.label}</th>`;
+                hF += `<th class="weekend-text text-[7px] cursor-pointer border-b" onclick="openHolidayModal('${ds}')">${fest}</th>`;
+                hK += `<th class="${isW?'weekend-text':''} text-[7px] border-b font-normal opacity-50">${["日","一","二","三","四","五","六"][date.getDay()]}</th>`;
+                h2 += `<th class="${isW?'weekend-text':''} border-b-2 font-black text-center text-[9px]">${d}</th>`;
             }
-            head.innerHTML = hW + `<th class="bg-slate-50 border-b"></th></tr>` + hF + `<th class="bg-slate-50 border-b"></th></tr>` + hK + `<th class="bg-slate-50 border-b"></th></tr>` + h2 + `<th class='bg-slate-100 text-center border-b-2 font-black text-[8px]'>共休</th></tr>`;
+            head.innerHTML = hW + `<th class="bg-slate-50 border-b"></th></tr>` + hF + `<th class="bg-slate-50 border-b"></th></tr>` + hK + `<th class="bg-slate-50 border-b"></th></tr>` + h2 + `<th class='bg-slate-100 text-[8px] text-center border-b-2 font-bold text-slate-400'>共休</th></tr>`;
 
             let bHtml="";
             staffGroups.forEach((g)=>{
                 g.members.forEach((n,mi)=>{
                     let groupClass = `group-${g.group}`, rOff = 0;
                     let row=`<tr class="${groupClass} hover:brightness-95 transition">`;
-                    if(mi===0) row+=`<td rowspan="${g.members.length}" class="shift-group-col bg-slate-50"><span>${g.group}</span>${isAdmin?`<button onclick="addMember('${g.group}')" class="bg-indigo-500 text-white rounded w-3.5 h-3.5 mx-auto mt-1 flex items-center justify-center"><i data-lucide="plus" class="w-2.5 h-2.5"></i></button>`:''}</td>`;
-                    row+=`<td class="name-col-sticky ${groupClass} font-bold"><div class="flex items-center justify-center gap-1"><input value="${n}" class="name-input" onchange="updateMemberName('${g.group}',${mi},this.value)" ${!isAdmin?'readonly':''}>${isAdmin?`<button onclick="removeMember('${g.group}',${mi})" class="text-slate-400"><i data-lucide="minus-circle" class="w-3 h-3"></i></button>`:''}</div></td>`;
-                    row+=`<td class="bg-white/10"></td>`;
+                    if(mi===0) row+=`<td rowspan="${g.members.length}" class="shift-group-col bg-slate-50"><span>${g.group}</span>${isAdmin?`<button onclick="addMember('${g.group}')" class="no-print bg-indigo-500 text-white rounded w-3.5 h-3.5 flex items-center justify-center mx-auto mt-1 transition active:scale-90 shadow-sm"><i data-lucide="plus" class="w-2.5 h-2.5"></i></button>`:''}</td>`;
+                    row+=`<td class="name-col-sticky ${groupClass} font-bold"><div class="flex items-center justify-center gap-1"><input value="${n}" class="name-input" onchange="updateMemberName('${g.group}',${mi},this.value)" ${!isAdmin?'readonly':''}>${isAdmin?`<button onclick="removeMember('${g.group}',${mi})" class="no-print text-slate-400 hover:text-rose-500 transition active:scale-90"><i data-lucide="minus-circle" class="w-3 h-3"></i></button>`:''}</div></td>`;
+                    row+=`<td class="bg-white/10 border-r"></td>`;
                     for (let d=1; d<=daysCount; d++) {
                         let ds=getSafeDateStr(currentYear, currentMonth, d), v=schedule[ds]?.[n]||"", isW=(new Date(currentYear,currentMonth,d).getDay()===0||new Date(currentYear,currentMonth,d).getDay()===6);
+                        const t=shiftTypes.find(x=>x.id===v); 
                         if(["休","特","補"].includes(v)) rOff++;
-                        const t=shiftTypes.find(x=>x.id===v);
-                        row+=`<td class="cursor-pointer transition ${t?t.color+' text-indigo-800 font-black':''} ${isW&&!v?'holiday-bg':''}" onclick="applyTool('${ds}','${n}')">${v==="休"?'<span class="text-rose-500 font-black">休</span>':v}</td>`;
+                        row+=`<td class="cursor-pointer transition ${t?t.color:''} ${isW&&!v?'holiday-bg':''}" onclick="applyTool('${ds}','${n}',${d})">${v==="休"?'<span class="font-bold text-rose-500">休</span>':v}</td>`;
                     }
-                    bHtml+=row+`<td class="font-black bg-slate-50/50 text-[9px] text-indigo-600 border-l-2">${rOff}</td></tr>`;
+                    bHtml+=row+`<td class="font-black bg-slate-50/50 text-[9px] text-center text-indigo-600 border-l-2">${rOff}</td></tr>`;
                 });
             });
             body.innerHTML = bHtml; lucide.createIcons();
         }
 
         function renderToolbar() {
-            const c = document.getElementById('toolbar');
-            if(!c) return;
-            c.innerHTML = shiftTypes.map(t => `<button onclick="selectTool('${t.id}')" id="tool-${t.id}" class="tool-btn ${t.color} px-3 py-1 rounded-lg text-[9px] font-black border-2 border-transparent ${selectedTool===t.id?'active-tool':''}">${t.label}</button>`).join('');
+            const container = document.getElementById('toolbar');
+            if(!container) return;
+            container.innerHTML = shiftTypes.map(t => `<button onclick="selectTool('${t.id}')" id="tool-${t.id}" class="tool-btn ${t.color} px-3 py-1 rounded-lg text-[9px] font-black border-2 border-transparent ${selectedTool === t.id ? 'active-tool' : ''}">${t.label}</button>`).join('');
         }
-
-        function selectTool(id) { selectedTool=id; shiftTypes.forEach(t=>{ const b=document.getElementById(`tool-${t.id}`); if(b) b.classList.toggle('active-tool', t.id===id); }); }
+        function selectTool(id) { selectedTool = id; shiftTypes.forEach(t => { const btn = document.getElementById(`tool-${t.id}`); if (btn) btn.classList.toggle('active-tool', t.id === id); }); }
         function openToolManager() { renderToolList(); document.getElementById('toolManagerModal').classList.remove('hidden'); lucide.createIcons(); }
         function closeToolManager() { document.getElementById('toolManagerModal').classList.add('hidden'); }
         function renderToolList() {
-            document.getElementById('toolList').innerHTML = shiftTypes.map((t, i) => `<div class="flex items-center justify-between p-2 bg-white rounded-xl border"><span class="${t.color} px-3 py-1 rounded text-[9px] font-black">${t.label}</span><button onclick="removeTool(${i})" class="text-rose-400 p-1"><i data-lucide="trash-2" class="w-3 h-3"></i></button></div>`).join('');
+            document.getElementById('toolList').innerHTML = shiftTypes.map((t, i) => `<div class="flex items-center justify-between p-2 bg-white rounded-xl border"><span class="${t.color} px-4 py-1 rounded-lg text-xs font-black shadow-sm">${t.label}</span><button onclick="removeTool(${i})" class="text-rose-400 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>`).join('');
             lucide.createIcons();
         }
         function addNewTool() {
-            const l = document.getElementById('newToolLabel').value.trim(), c = document.getElementById('newToolColor').value;
-            if(!l) return; shiftTypes.push({ id: l, label: l, color: c });
+            const label = document.getElementById('newToolLabel').value.trim(), color = document.getElementById('newToolColor').value;
+            if(!label) return; shiftTypes.push({ id: label, label, color });
             document.getElementById('newToolLabel').value = ''; renderToolList(); renderToolbar();
         }
         function removeTool(i) { shiftTypes.splice(i, 1); renderToolList(); renderToolbar(); }
-        async function saveToolsToCloud() { try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'toolbar_settings', 'current'), { data: shiftTypes }); alert("工具列已儲存！"); closeToolManager(); } catch(e) { alert("儲存失敗"); } }
+        async function saveToolsToCloud() {
+            if(!window.auth.currentUser) return;
+            try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'toolbar_settings', 'current'), { data: shiftTypes }); alert("存檔成功！"); closeToolManager(); } catch(e) { alert("儲存失敗"); }
+        }
 
-        function toggleAdmin() { if(isAdmin){ isAdmin=false; document.body.classList.remove('is-admin'); document.getElementById('adminIcon').setAttribute('data-lucide','lock'); } else { document.getElementById('loginModal').classList.remove('hidden'); document.getElementById('adminPassword').focus(); } renderMonthlyTable(); lucide.createIcons(); }
-        function verifyPassword() { if(document.getElementById('adminPassword').value==="1234"){ isAdmin=true; document.body.classList.add('is-admin'); document.getElementById('adminIcon').setAttribute('data-lucide','unlock'); closeLogin(); renderMonthlyTable(); lucide.createIcons(); } else alert("錯誤"); }
+        function toggleAdmin() { 
+            if(isAdmin){ isAdmin=false; document.body.classList.remove('is-admin'); document.getElementById('adminIcon').setAttribute('data-lucide','lock'); } 
+            else { document.getElementById('loginModal').classList.remove('hidden'); document.getElementById('adminPassword').focus(); } 
+            renderMonthlyTable(); lucide.createIcons();
+        }
+        function verifyPassword() { if(document.getElementById('adminPassword').value==="1234"){ isAdmin=true; document.body.classList.add('is-admin'); document.getElementById('adminIcon').setAttribute('data-lucide','unlock'); closeLogin(); renderMonthlyTable(); lucide.createIcons(); } else alert("密碼錯誤"); }
         function closeLogin(){ document.getElementById('loginModal').classList.add('hidden'); document.getElementById('adminPassword').value=''; }
         function openVacationModal() { const m = document.getElementById('vacationModal'); m.classList.remove('hidden'); m.style.top = "10vh"; m.style.left = "2.5vw"; }
         function closeVacationModal() { document.getElementById('vacationModal').classList.add('hidden'); }
         function openHolidayModal(d){ holidayEditContext=d; document.getElementById('holidayModalDate').innerText=d; document.getElementById('holidayInput').value=holidayRemarks[d]||""; document.getElementById('holidayModal').classList.remove('hidden'); }
         function closeHolidayModal(){ document.getElementById('holidayModal').classList.add('hidden'); }
-
         function applyTool(ds, n) { if(!isAdmin && !["休","特","補","CLEAR"].includes(selectedTool)) return; if(!schedule[ds]) schedule[ds] = {}; if(selectedTool === "CLEAR") delete schedule[ds][n]; else schedule[ds][n] = selectedTool; triggerAutoSave(); renderMonthlyTable(); }
         function updateMemberName(g, mi, v) { 
             const grp = staffGroups.find(x=>x.group===g); const old = grp.members[mi]; grp.members[mi] = v;
@@ -368,65 +403,14 @@
         function changeMonth(o) { currentMonth+=o; if(currentMonth>11){currentMonth=0;currentYear++;} else if(currentMonth<0){currentMonth=11;currentYear--;} renderMonthlyTable(); }
         function getOptions(list, sel) { return list.map(v => `<option value="${v}" ${v === sel ? 'selected' : ''}>${v}</option>`).join(''); }
         function getStaffOptions(sel) { let o = `<option value="ALL" ${sel === 'ALL' ? 'selected' : ''}>-- 全體 --</option>`; staffGroups.forEach(g => g.members.forEach(m => o += `<option value="${m}" ${sel === m ? 'selected' : ''}>${m}</option>`)); return o; }
-        function closeWeeklyConfirm() { document.getElementById('weeklyConfirmView').classList.add('hidden'); }
-        function openLogicSettings() { renderAddLogicForm(); renderLogicList(); document.getElementById('logicSettingsModal').classList.remove('hidden'); }
-        function closeLogicSettings() { editLogicIndex = -1; document.getElementById('logicSettingsModal').classList.add('hidden'); }
-        function renderAddLogicForm() {
-            let o = `<option value="ALL">-- 全體人員 --</option>`; staffGroups.forEach(g=>g.members.forEach(m=>o+=`<option value="${m}">${m}</option>`));
-            document.getElementById('addLogicContainer').innerHTML = `
-                <div><label class="text-[7px] font-bold">分組</label><select id="logicGroup" class="w-full border rounded p-1 text-[9px]">${getOptions(["早班","中班","晚班","夜班"], "")}</select></div>
-                <div><label class="text-[7px] font-bold">代碼</label><input id="logicCode" class="w-full border rounded p-1 text-[9px] outline-none"></div>
-                <div><label class="text-[7px] font-bold">適用</label><select id="logicStaff" class="w-full border rounded p-1 text-[9px]">${o}</select></div>
-                <div><label class="text-[7px] font-bold">時段</label><select id="logicTime" class="w-full border rounded p-1 text-[9px]">${getOptions(TIME_OPTIONS, "")}</select></div>
-                <div><label class="text-[7px] font-bold">主崗</label><select id="logicPosMain" class="w-full border rounded p-1 text-[9px]"><option value="">無</option>${getOptions(POS_MAIN_OPTIONS, "")}</select></div>
-                <div><label class="text-[7px] font-bold">副崗</label><select id="logicPosSub" class="w-full border rounded p-1 text-[9px]"><option value="">無</option>${getOptions(POS_SUB_OPTIONS, "")}</select></div>`;
-        }
-        function renderLogicList() {
-            document.getElementById('logicListBody').innerHTML = shiftLogic.map((l, i) => {
-                if(editLogicIndex === i) return `<tr class="bg-indigo-50"><td class="p-1 border"><select id="editGroup" class="text-[9px]">${getOptions(["早班","中班","晚班","夜班"], l.group)}</select></td><td class="p-1 border text-center font-bold">OK</td></tr>`;
-                return `<tr class="border-b text-[9px]"><td class="p-1.5 border font-bold">${l.group}</td><td class="p-1.5 border font-black text-indigo-600">${l.code}</td><td class="p-1.5 border">${l.person === 'ALL' ? '全體' : l.person}</td><td class="p-1.5 border">${l.time}</td><td class="p-1.5 border font-black">${l.posMain || '-'}</td><td class="p-1.5 border text-slate-400">${l.posSub || '-'}</td><td class="p-1.5 border text-center"><button onclick="startEditLogic(${i})" class="text-indigo-400">編輯</button></td></tr>`;
-            }).join('');
-            lucide.createIcons();
-        }
-        function startEditLogic(i) { editLogicIndex = i; renderLogicList(); }
-        function addLogicRow() { const code = document.getElementById('logicCode').value.trim(); if(!code) return alert("必填"); shiftLogic.push({ group: document.getElementById('logicGroup').value, code, person: document.getElementById('logicStaff').value, time: document.getElementById('logicTime').value, posMain: document.getElementById('logicPosMain').value, posSub: document.getElementById('logicPosSub').value }); document.getElementById('logicCode').value = ''; renderLogicList(); }
-        async function saveLogicToCloud() { try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'logic', 'current'), { data: shiftLogic }); alert("已儲存"); } catch(e) { alert("失敗"); }}
 
-        function prepareWeeklyReport() {
-            const sStr = document.getElementById('vacationStart').value; if(!sStr) return alert("選日期");
-            const c = document.getElementById('weeklyConfirmContent'); c.innerHTML = ''; const sd = new Date(sStr);
-            for(let i=0; i<6; i++) {
-                let d = new Date(sd); d.setDate(d.getDate() + i); let ds = getSafeDateStr(d.getFullYear(), d.getMonth(), d.getDate()), dd = schedule[ds] || {};
-                let mC=0, cC=0, eC=0, rows = "";
-                staffGroups.forEach(g => g.members.forEach(m => {
-                    const code = dd[m]; if (!code || ["休","特","補","離職"].includes(code)) return;
-                    let l = shiftLogic.find(x => x.code === code && x.person === m) || shiftLogic.find(x => x.code === code && x.person === 'ALL');
-                    if (l) {
-                        if(l.group === "早班") mC++; else if(l.group === "夜班") eC++; else cC++;
-                        rows += `<tr><td class="text-[9px]">${l.time}</td><td class="font-black text-xs">${m.slice(-1)}</td><td class="text-[9px]">${l.posMain+(l.posSub?`(${l.posSub})`:'')}</td><td class="font-black">${l.group==="早班"?mC:''}</td><td class="font-black">${["中班","晚班"].includes(l.group)?cC:''}</td><td class="font-black">${l.group==="夜班"?eC:''}</td></tr>`;
-                    }
-                }));
-                let cr = (rows.match(/<tr/g) || []).length; for(let r=0; r < (11-cr); r++) rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
-                const off = Object.keys(dd).filter(n => ["休","特","補"].includes(dd[n])).map(n => n.slice(-1)).join('、');
-                c.innerHTML += `<div class="day-card-container"><div class="report-day-title">${d.getMonth()+1}/${d.getDate()} (週${["日","一","二","三","四","五","六"][d.getDay()]})</div><table class="report-table-final"><tr class="bg-slate-50 font-black text-[8px]"><td>班別</td><td>人</td><td>崗</td><td>早</td><td>中</td><td>晚</td></tr>${rows}</table><div class="mt-2 text-[9px] flex justify-between px-1"><span class="font-bold">休假：<span class="text-rose-500 font-black">${off || '無'}</span></span><span>券：____</span></div></div>`;
-            }
-            document.getElementById('weeklyConfirmView').classList.remove('hidden'); lucide.createIcons();
+        function makeDraggable(el, h) {
+            let x=0,y=0,mx=0,my=0;
+            const oS=(e)=>{ const isT=e.type==='touchstart'; const cX=isT?e.touches[0].clientX:e.clientX; const cY=isT?e.touches[0].clientY:e.clientY; mx=cX; my=cY; document.onmouseup=oE; document.ontouchend=oE; document.onmousemove=oM; document.ontouchmove=oM; };
+            const oM=(e)=>{ const isT=e.type==='touchmove'; const cX=isT?e.touches[0].clientX:e.clientX; const cY=isT?e.touches[0].clientY:e.clientY; x=mx-cX; y=my-cY; mx=cX; my=cY; el.style.top=(el.offsetTop-y)+"px"; el.style.left=(el.offsetLeft-x)+"px"; };
+            const oE=()=>{ document.onmouseup=null; document.ontouchend=null; document.onmousemove=null; document.ontouchmove=null; };
+            h.onmousedown=oS; h.ontouchstart=oS;
         }
-        async function saveWeeklyToDatabase() { const data = Array.from(document.querySelectorAll('.day-card-container')).map(c => ({ date: c.getAttribute('data-date'), html: c.innerHTML })); try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'reports', `week_${data[0].date}`), { createdAt: new Date().toISOString(), data }); alert("存檔成功"); } catch(e) { alert("失敗"); }}
-        
-        function generateVacationList() {
-            const s=document.getElementById('vacationStart').value, e=document.getElementById('vacationEnd').value; if(!s||!e) return;
-            let html="", sd=new Date(s), ed=new Date(e);
-            for(let d=new Date(sd); d<=ed; d.setDate(d.getDate()+1)) {
-                let ds=getSafeDateStr(d.getFullYear(), d.getMonth(), d.getDate()), dd=schedule[ds]||{};
-                const l1=Object.keys(dd).filter(n=>dd[n]==="休"), l2=Object.keys(dd).filter(n=>dd[n]==="特");
-                if(l1.length||l2.length) html+=`<div class="p-2 bg-white border rounded shadow-sm text-[9px] font-bold"><b class="text-indigo-600 block border-b mb-1">${ds}</b>休: ${l1.join(',')}</div>`;
-            }
-            document.getElementById('vacationListContent').innerHTML=html||'無紀錄';
-        }
-
-        // 觸控支援
-        function makeDraggable(el,h){let x=0,y=0,mx=0,my=0;const oS=(e)=>{const isT=e.type==='touchstart';const cX=isT?e.touches[0].clientX:e.clientX;const cY=isT?e.touches[0].clientY:e.clientY;mx=cX;my=cY;document.onmouseup=oE;document.ontouchend=oE;document.onmousemove=oM;document.ontouchmove=oM;};const oM=(e)=>{const isT=e.type==='touchmove';const cX=isT?e.touches[0].clientX:e.clientX;const cY=isT?e.touches[0].clientY:e.clientY;x=mx-cX;y=my-cY;mx=cX;my=cY;el.style.top=(el.offsetTop-y)+"px";el.style.left=(el.offsetLeft-x)+"px";};const oE=()=>{document.onmouseup=null;document.ontouchend=null;document.onmousemove=null;document.ontouchmove=null;};h.onmousedown=oS;h.ontouchstart=oS;}
 
         window.onload = init;
     </script>
