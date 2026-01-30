@@ -95,6 +95,7 @@
         .staff-count-input { width: 28px; border-bottom: 1px solid #cbd5e1; text-align: center; font-weight: bold; background: #f1f5f9; outline: none; border-radius: 2px; }
 
         #syncBadge { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: none; }
+        .badge-success { background-color: #10b981 !important; }
 
         @media print {
             .no-print { display: none !important; }
@@ -106,9 +107,10 @@
 </head>
 <body class="p-4">
 
-    <!-- 同步狀態 -->
+    <!-- 同步狀態指示燈 -->
     <div id="syncBadge" class="bg-slate-900 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold transition-all border border-slate-700">
-        <i data-lucide="refresh-cw" class="w-4 h-4 animate-spin text-indigo-400"></i> 雲端同步中...
+        <span id="syncIcon"><i data-lucide="refresh-cw" class="w-4 h-4 animate-spin text-indigo-400"></i></span>
+        <span id="syncText">雲端同步中...</span>
     </div>
 
     <div id="app" class="max-w-full mx-auto">
@@ -162,7 +164,7 @@
 
         <footer class="mt-4 text-[10px] text-slate-400 no-print flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
             <div class="flex gap-4 items-center">
-                <span class="flex items-center gap-1 font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md"><i data-lucide="shield-check" class="w-3 h-3"></i> 即時同步系統已啟動</span>
+                <span class="flex items-center gap-1 font-bold text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md"><i data-lucide="shield-check" class="w-3 h-3"></i> 雲端自動存檔已啟動</span>
                 <span class="admin-only font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase tracking-widest">管理者模式</span>
             </div>
             <div class="flex gap-4 items-center">
@@ -194,7 +196,7 @@
         </div>
     </div>
 
-    <!-- 工具管理視窗 (修正顏色選單) -->
+    <!-- 工具管理視窗 -->
     <div id="toolManagerModal" class="fixed inset-0 modal-overlay hidden flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200">
             <div class="bg-indigo-900 p-4 text-white flex justify-between items-center">
@@ -212,7 +214,6 @@
                             <option value="bg-rose-100 text-rose-600">紅色 (休假)</option>
                             <option value="bg-amber-100 text-amber-700">橘色 (特休)</option>
                             <option value="bg-blue-100 text-blue-700">藍色 (補休)</option>
-                            <!-- 紫色改綠色 -->
                             <option value="bg-emerald-100 text-emerald-700">綠色 (上班)</option>
                         </select>
                         <button onclick="addNewTool()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition hover:bg-indigo-700 active:scale-95">新增</button>
@@ -228,7 +229,7 @@
 
     <!-- 排班邏輯與週報表其餘彈窗內容保持一致 -->
     <div id="logicSettingsModal" class="fixed inset-0 modal-overlay hidden flex items-center justify-center p-4 no-print">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden border border-slate-200">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden border border-slate-300">
             <div class="bg-slate-900 p-4 text-white flex justify-between items-center">
                 <h3 class="font-bold flex items-center gap-2"><i data-lucide="cpu" class="w-5 h-5 text-indigo-400"></i> 排班邏輯對應設定</h3>
                 <button onclick="closeLogicSettings()"><i data-lucide="x"></i></button>
@@ -275,7 +276,7 @@
 
     <div id="holidayModal" class="fixed inset-0 modal-overlay hidden flex items-center justify-center no-print">
         <div class="bg-white p-6 rounded-2xl shadow-xl w-80">
-            <h3 class="text-base font-black mb-2">節慶備註</h3>
+            <h3 class="text-base font-black mb-2 text-slate-800">節慶備註</h3>
             <p id="holidayModalDate" class="text-[10px] text-slate-400 mb-3 border-b pb-2"></p>
             <textarea id="holidayInput" class="w-full border bg-slate-50 rounded-xl p-3 text-xs h-28 focus:ring-1 focus:ring-indigo-500 outline-none"></textarea>
             <div class="flex justify-end gap-3 mt-4">
@@ -311,9 +312,17 @@
         const POS_MAIN_OPTIONS = ["機","拉","A下","A上","B","櫃結","外B","消毒"];
         const POS_SUB_OPTIONS = ["機","拉","A下","B","櫃結","外B","B結"];
 
-        function init() { makeDraggable(document.getElementById('vacationModal'), document.getElementById('vacationModalHeader')); lucide.createIcons(); }
+        // 初始化時直接渲染預設表格，避免空白
+        function init() { 
+            renderToolbar(); 
+            renderMonthlyTable(); 
+            makeDraggable(document.getElementById('vacationModal'), document.getElementById('vacationModalHeader')); 
+            lucide.createIcons(); 
+        }
+
         function getSafeDateStr(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
 
+        // --- 核心：雲端載入 ---
         window.loadGlobalState = async () => {
             if(!window.auth.currentUser) return;
             const path = (c) => `artifacts/${window.appId}/public/data/${c}`;
@@ -340,10 +349,25 @@
         function triggerAutoSave() {
             if(saveTimeout) clearTimeout(saveTimeout);
             document.getElementById('syncBadge').style.display = 'flex';
+            document.getElementById('syncBadge').classList.remove('badge-success');
+            document.getElementById('syncText').innerText = "雲端同步中...";
+            document.getElementById('syncIcon').innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4 animate-spin text-indigo-400"></i>';
+            lucide.createIcons();
+            
             saveTimeout = setTimeout(async () => {
-                await performCloudSave();
-                document.getElementById('syncBadge').style.display = 'none';
-            }, 500); // 加速至 500ms
+                try {
+                    await performCloudSave();
+                    // 顯示成功狀態後消失
+                    document.getElementById('syncBadge').classList.add('badge-success');
+                    document.getElementById('syncText').innerText = "同步完成";
+                    document.getElementById('syncIcon').innerHTML = '<i data-lucide="check" class="w-4 h-4 text-white"></i>';
+                    lucide.createIcons();
+                    setTimeout(() => { document.getElementById('syncBadge').style.display = 'none'; }, 1000);
+                } catch(e) {
+                    document.getElementById('syncText').innerText = "同步失敗";
+                    setTimeout(() => { document.getElementById('syncBadge').style.display = 'none'; }, 2000);
+                }
+            }, 500); 
         }
 
         async function performCloudSave() {
@@ -355,8 +379,8 @@
                     window.fbSetDoc(window.fbDoc(window.db, path('personnel_config'), 'current'), { staffGroups, requiredStaffCount, leaveSummary: document.getElementById('leaveSummary').value }),
                     window.fbSetDoc(window.fbDoc(window.db, path('holiday_remarks'), 'current'), { remarks: holidayRemarks })
                 ]);
-                document.getElementById('modifyTime').innerText = `${new Date().toLocaleTimeString()}`;
-            } catch(e) { console.error(e); }
+                document.getElementById('modifyTime').innerText = `已同步：${new Date().toLocaleTimeString()}`;
+            } catch(e) { throw e; }
         }
 
         function renderMonthlyTable() {
@@ -435,7 +459,7 @@
             shiftTypes.push({ id: label, label, color });
             document.getElementById('newToolLabel').value = '';
             renderToolList();
-            renderToolbar();
+            renderToolbar(); // 立即同步顯示在前端預覽
             lucide.createIcons();
         }
         function removeTool(i) { shiftTypes.splice(i, 1); renderToolList(); renderToolbar(); lucide.createIcons(); }
@@ -471,12 +495,12 @@
         function renderAddLogicForm() {
             let o = `<option value="ALL">-- 全體人員 --</option>`; staffGroups.forEach(g=>g.members.forEach(m=>o+=`<option value="${m}">${m}</option>`));
             document.getElementById('addLogicContainer').innerHTML = `
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1">班別</label><select id="logicGroup" class="w-full border rounded p-2 text-xs">${getOptions(["早班","中班","晚班","夜班"], "")}</select></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1">代碼</label><input id="logicCode" class="w-full border rounded p-2 text-xs outline-none"></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1">人員</label><select id="logicStaff" class="w-full border rounded p-2 text-xs">${o}</select></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1">時段</label><select id="logicTime" class="w-full border rounded p-2 text-xs">${getOptions(TIME_OPTIONS, "")}</select></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1">主崗</label><select id="logicPosMain" class="w-full border rounded p-2 text-xs"><option value="">無</option>${getOptions(POS_MAIN_OPTIONS, "")}</select></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1">副崗</label><select id="logicPosSub" class="w-full border rounded p-2 text-xs"><option value="">無</option>${getOptions(POS_SUB_OPTIONS, "")}</select></div>`;
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">分組</label><select id="logicGroup" class="w-full border rounded p-2 text-xs">${getOptions(["早班","中班","晚班","夜班"], "")}</select></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">代碼</label><input id="logicCode" class="w-full border rounded p-2 text-xs outline-none"></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">適用人</label><select id="logicStaff" class="w-full border rounded p-2 text-xs">${o}</select></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">時段</label><select id="logicTime" class="w-full border rounded p-2 text-xs">${getOptions(TIME_OPTIONS, "")}</select></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">主崗位</label><select id="logicPosMain" class="w-full border rounded p-2 text-xs"><option value="">無</option>${getOptions(POS_MAIN_OPTIONS, "")}</select></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">副崗位</label><select id="logicPosSub" class="w-full border rounded p-2 text-xs"><option value="">無</option>${getOptions(POS_SUB_OPTIONS, "")}</select></div>`;
         }
         function renderLogicList() {
             const b = document.getElementById('logicListBody');
@@ -498,12 +522,12 @@
                     let l = shiftLogic.find(x => x.code === c && x.person === m) || shiftLogic.find(x => x.code === c && x.person === 'ALL');
                     if (l) {
                         if(l.group === "早班") mC++; else if(l.group === "夜班") eC++; else cC++;
-                        rows += `<tr><td contenteditable="true">${l.time}</td><td contenteditable="true" class="font-black text-sm">${m.slice(-1)}</td><td contenteditable="true">${l.posMain + (l.posSub ? `(${l.posSub})` : '')}</td><td class="font-black">${l.group === "早班" ? mC : ''}</td><td class="font-black">${["中班","晚班"].includes(l.group) ? cC : ''}</td><td class="font-black">${l.group === "夜班" ? eC : ''}</td></tr>`;
+                        rows += `<tr><td contenteditable="true" class="text-[11px]">${l.time}</td><td contenteditable="true" class="font-black text-sm">${m.slice(-1)}</td><td contenteditable="true" class="text-center font-bold text-[11px]">${l.posMain + (l.posSub ? `(${l.posSub})` : '')}</td><td class="font-black" contenteditable="true">${l.group === "早班" ? mC : ''}</td><td class="font-black" contenteditable="true">${["中班","晚班"].includes(l.group) ? cC : ''}</td><td class="font-black" contenteditable="true">${l.group === "夜班" ? eC : ''}</td></tr>`;
                     }
                 }));
                 let cr = (rows.match(/<tr/g) || []).length; for(let r=0; r < (11-cr); r++) rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
                 const off = Object.keys(dd).filter(n => ["休","特","補"].includes(dd[n])).map(n => n.slice(-1)).join('、');
-                content.innerHTML += `<div class="day-card-container" data-date="${ds}"><div class="report-day-title" contenteditable="true">${d.getMonth()+1}/${d.getDate()} (週${["日","一","二","三","四","五","六"][d.getDay()]})</div><table class="report-table-final"><tr class="bg-slate-50 font-bold"><td>班別</td><td>人員</td><td>崗位</td><td>早</td><td>中</td><td>晚</td></tr>${rows}</table><div class="mt-2 text-[10px] flex justify-between px-1"><span class="font-bold">休假人員：<span contenteditable="true" class="underline text-rose-500 font-black">${off || '無'}</span></span><span>發券：_______</span></div></div>`;
+                content.innerHTML += `<div class="day-card-container" data-date="${ds}"><div class="report-day-title" contenteditable="true">${d.getMonth()+1}/${d.getDate()} (週${["日","一","二","三","四","五","六"][d.getDay()]})</div><table class="report-table-final"><tr class="bg-slate-50 font-bold text-[10px]"><td>班別</td><td>人員</td><td>崗位</td><td>早</td><td>中</td><td>晚</td></tr>${rows}</table><div class="mt-2 text-[10px] flex justify-between px-1"><span class="font-bold text-slate-800">休假人員：<span contenteditable="true" class="underline text-rose-500 font-black">${off || '無'}</span></span><span>發券：_______</span></div></div>`;
             }
             document.getElementById('weeklyConfirmView').classList.remove('hidden'); lucide.createIcons();
         }
@@ -531,6 +555,7 @@
         function getOptions(list, sel) { return list.map(v => `<option value="${v}" ${v === sel ? 'selected' : ''}>${v}</option>`).join(''); }
         function getStaffOptions(sel) { let o = `<option value="ALL" ${sel === 'ALL' ? 'selected' : ''}>-- 全體 --</option>`; staffGroups.forEach(g => g.members.forEach(m => o += `<option value="${m}" ${sel === m ? 'selected' : ''}>${m}</option>`)); return o; }
         function makeDraggable(el,h){let x=0,y=0,mx=0,my=0;h.onmousedown=(e)=>{e.preventDefault();mx=e.clientX;my=e.clientY;document.onmouseup=()=>{document.onmouseup=null;document.onmousemove=null;};document.onmousemove=(e)=>{e.preventDefault();x=mx-e.clientX;y=my-e.clientY;mx=e.clientX;my=e.clientY;el.style.top=(el.offsetTop-y)+"px";el.style.left=(el.offsetLeft-x)+"px";};};}
+        function undo(){} function redo(){}
 
         window.onload = init;
     </script>
