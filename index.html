@@ -11,9 +11,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global Config (Provided by environment)
         const firebaseConfig = JSON.parse(__firebase_config);
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -24,14 +23,12 @@
         window.auth = auth;
         window.appId = appId;
         
-        window.fbCollection = collection;
         window.fbDoc = doc;
         window.fbSetDoc = setDoc;
+        window.fbGetDoc = getDoc;
+        window.fbCollection = collection;
         window.fbGetDocs = getDocs;
-        window.fbQuery = query;
-        window.fbOnSnapshot = onSnapshot;
-        window.fbAddDoc = addDoc;
-        
+
         const initAuth = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -40,16 +37,13 @@
                     await signInAnonymously(auth);
                 }
             } catch (err) {
-                console.error("Auth Error:", err);
+                console.error("Auth Fail:", err);
             }
         };
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                console.log("Authenticated");
-                if (typeof window.loadSettings === 'function') {
-                    window.loadSettings();
-                }
+                window.loadGlobalState(); 
             }
         });
 
@@ -63,114 +57,92 @@
         table { border-collapse: separate; border-spacing: 0; width: 100%; }
         th, td { border: 1px solid #e2e8f0; text-align: center; padding: 0.3rem 0.2rem; font-size: 0.7rem; min-width: 34px; }
         
-        /* 固定欄位樣式 */
-        .sticky-col { position: sticky; left: 0; background: inherit; z-index: 10; border-right: 2px solid #cbd5e1; min-width: 120px; }
-        .shift-group-col { 
-            position: sticky; 
-            left: 0; 
-            z-index: 11; 
-            font-weight: bold; 
-            writing-mode: vertical-rl; 
-            text-orientation: upright; 
-            padding: 2px; 
-            font-size: 9px; 
-            min-width: 30px !important; 
-            width: 30px !important; 
-            background: #f8fafc;
-        }
-        .name-col-sticky {
-            position: sticky;
-            left: 30px;
-            z-index: 10;
-            background: inherit;
-            border-right: 2px solid #cbd5e1;
-            min-width: 100px;
-        }
+        .shift-group-col { position: sticky; left: 0; z-index: 20; background: #f8fafc; font-weight: bold; writing-mode: vertical-rl; text-orientation: upright; width: 30px !important; min-width: 30px !important; border-right: 1px solid #cbd5e1; }
+        .name-col-sticky { position: sticky; left: 30px; z-index: 19; background: #fff; border-right: 2px solid #cbd5e1; width: 105px !important; min-width: 105px !important; }
 
         .weekend-text { color: #ef4444; font-weight: bold; }
         .holiday-bg { background-color: rgba(254, 226, 226, 0.4); }
-        .cell-off { color: #ef4444; font-weight: bold; }
-        .active-tool { ring: 2px; ring-color: #4f46e5; border-color: white !important; }
         
-        .name-input { width: 85px; border: none; outline: none; background: transparent; font-size: 0.75rem; text-align: center !important; font-weight: 700 !important; }
-        .name-input:focus { background: rgba(255,255,255,0.5); border-radius: 4px; }
+        /* 選取工具視覺效果 */
+        .active-tool { 
+            outline: 3px solid #4f46e5 !important; 
+            outline-offset: 2px;
+            transform: scale(1.1);
+            z-index: 10;
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.2) !important;
+        }
         
-        .group-早班 { background-color: #fefce8; }
-        .group-中班 { background-color: #f0fdf4; }
-        .group-晚班 { background-color: #eff6ff; }
-        .group-夜班 { background-color: #faf5ff; }
-
+        .name-input { width: 90px; border: none; outline: none; background: transparent; font-size: 0.75rem; text-align: center; font-weight: 700; }
+        .name-input:focus { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        
         .modal-overlay { background: rgba(0,0,0,0.5); z-index: 100; }
         .draggable-handle { cursor: move; }
 
-        /* 週排班確認頁格式 - 依照圖片還原 */
-        .weekly-confirm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px; background: #fff; }
-        .day-card-container { border: 1.5px solid #000; padding: 5px; background: #fff; }
+        .weekly-confirm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 10px; background: #fff; }
+        .day-card-container { border: 2px solid #000; padding: 6px; background: #fff; }
+        .report-day-title { text-align: center; font-weight: 900; border-bottom: 2px solid #000; margin-bottom: 5px; padding-bottom: 3px; font-size: 12px; }
         .report-table-final { width: 100%; border-collapse: collapse; font-size: 10px; }
-        .report-table-final td { border: 1px solid #000; height: 22px; text-align: center; color: #000; }
-        .report-header { font-weight: bold; background-color: #f8f9fa; }
-        .editable-cell:focus { background: #e0f2fe; outline: 1px solid #0ea5e9; }
-        .report-day-title { text-align: center; font-weight: 800; border-bottom: 2.5px solid #000; margin-bottom: 4px; padding-bottom: 2px; font-size: 11px; }
+        .report-table-final td { border: 1px solid #000; height: 24px; text-align: center; }
+        .editable-cell:focus { background: #f0f9ff; outline: 1px solid #3b82f6; }
 
-        .admin-only { display: none; }
-        body.is-admin .admin-only { display: block; }
+        /* 管理員限定顯示 */
+        .admin-only { display: none !important; }
+        body.is-admin .admin-only { display: flex !important; }
         
-        .staff-count-box { font-size: 8px; line-height: 1.2; display: flex; flex-direction: column; gap: 1px; padding: 2px; text-align: left; }
-        .staff-count-input { width: 20px; border-bottom: 1px solid #cbd5e1; text-align: center; font-weight: bold; background: transparent; outline: none; }
-
+        .staff-count-box { font-size: 8px; line-height: 1.3; display: flex; flex-direction: column; padding: 4px 2px; }
+        .staff-count-input { width: 28px; border-bottom: 1px solid #cbd5e1; text-align: center; font-weight: bold; background: #f1f5f9; outline: none; border-radius: 2px; }
         .summary-input { border: 1px solid #e2e8f0; background-color: #f8fafc; color: #475569; border-radius: 0.375rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 600; width: 120px; }
+
+        #syncBadge { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: none; }
 
         @media print {
             .no-print { display: none !important; }
-            #weeklyConfirmView { display: block !important; position: static !important; width: 100% !important; height: auto !important; overflow: visible !important; }
+            #weeklyConfirmView { display: block !important; position: static !important; overflow: visible !important; width: 100% !important; }
             .weekly-confirm-grid { grid-template-columns: repeat(2, 1fr) !important; padding: 0 !important; }
-            .day-card-container { page-break-inside: avoid; }
-            @page { size: A4 portrait; margin: 3mm; }
+            @page { size: A4 portrait; margin: 5mm; }
         }
     </style>
 </head>
 <body class="p-4">
 
+    <!-- 即時存檔指示 -->
+    <div id="syncBadge" class="bg-indigo-600 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-bold animate-pulse">
+        <i data-lucide="cloud-upload" class="w-4 h-4"></i> 雲端同步中...
+    </div>
+
     <div id="app" class="max-w-full mx-auto">
         <header class="mb-4 flex flex-col md:flex-row justify-between items-end gap-4 no-print">
             <div class="flex items-end gap-6">
                 <div>
-                    <h1 id="tableTitle" class="text-xl font-bold text-slate-800">中清店-月度預排休假表</h1>
-                    <div class="flex items-center gap-2 mt-1">
+                    <h1 id="tableTitle" class="text-xl font-bold text-slate-800 tracking-tighter">中清店-月度預排休假表</h1>
+                    <div class="flex items-center gap-2 mt-1 text-sm font-bold">
                         <button onclick="changeMonth(-1)" class="p-1 hover:bg-slate-200 rounded transition"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
-                        <span id="monthDisplay" class="font-medium text-slate-600 text-sm">2026年 2月</span>
+                        <span id="monthDisplay">2026年 2月</span>
                         <button onclick="changeMonth(1)" class="p-1 hover:bg-slate-200 rounded transition"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
                     </div>
-                </div>
-                
-                <div class="flex gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
-                    <button onclick="undo()" id="undoBtn" class="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition" title="復原 (Ctrl+Z)">
-                        <i data-lucide="undo-2" class="w-3.5 h-3.5"></i>
-                    </button>
-                    <button onclick="redo()" id="redoBtn" class="p-1 text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition" title="下一步 (Ctrl+Y)">
-                        <i data-lucide="redo-2" class="w-3.5 h-3.5"></i>
-                    </button>
                 </div>
             </div>
 
             <div class="flex flex-wrap gap-2 items-center">
-                <div class="bg-white p-1.5 rounded-lg shadow-sm border border-slate-200 flex gap-2 items-center">
-                    <span class="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-wider">快速選取：</span>
-                    <div id="toolbar" class="flex gap-1 items-center"></div>
-                    <button onclick="openToolManager()" class="p-1 text-indigo-500 hover:bg-indigo-50 rounded" title="管理自定義班次">
-                        <i data-lucide="settings-2" class="w-3.5 h-3.5"></i>
-                    </button>
+                <div class="bg-white p-2 rounded-xl shadow-sm border border-slate-200 flex gap-3 items-center">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-wider">快速選取：</span>
+                        <button onclick="openToolManager()" class="admin-only text-[9px] text-indigo-600 hover:underline px-1 text-left flex items-center gap-1 font-bold">
+                            <i data-lucide="edit-2" class="w-2.5 h-2.5"></i> 管理工具
+                        </button>
+                    </div>
+                    <div id="toolbar" class="flex gap-2 items-center"></div>
                 </div>
                 <div class="bg-white p-1.5 rounded-lg shadow-sm border border-slate-200 flex gap-2 items-center">
                     <span class="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-wider">休假概況：</span>
-                    <input type="text" id="leaveSummary" value="4例4休6國" class="summary-input" onchange="updateLeaveSummary(this.value)" readonly>
+                    <input type="text" id="leaveSummary" value="4例4休6國" class="summary-input" oninput="triggerAutoSave()" readonly>
                 </div>
             </div>
 
             <div class="flex gap-2 items-center">
                 <div class="admin-only">
-                    <button onclick="openVacationModal()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs hover:bg-indigo-700 transition shadow-sm">
-                        <i data-lucide="shield-check" class="w-3 h-3"></i> 管理者專區
+                    <button onclick="openVacationModal()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs hover:bg-indigo-700 transition shadow-sm font-bold">
+                        <i data-lucide="shield" class="w-4 h-4 text-emerald-300"></i> 管理者專區
                     </button>
                 </div>
                 <button id="adminBtn" onclick="toggleAdmin()" class="p-2 text-slate-400 hover:text-indigo-600 bg-white border border-slate-200 rounded-lg shadow-sm transition">
@@ -187,60 +159,74 @@
             </table>
         </div>
 
-        <footer class="mt-3 text-[10px] text-slate-400 no-print flex flex-wrap gap-4 uppercase tracking-tighter items-center">
-            <span class="flex items-center gap-1"><i data-lucide="info" class="w-3 h-3"></i> 快速選取：點擊項目後，點擊單元格。</span>
-            <span class="admin-only font-bold text-indigo-600">● 管理者模式已解鎖</span>
-            <div class="ml-auto flex items-center gap-4">
-                <span class="opacity-60">© 原點數位科技</span>
-                <span id="versionLabel" class="font-mono opacity-60 text-[9px]">版本：-</span>
-                <span id="modifyTime" class="text-[9px] opacity-40 italic">最後修改時間：-</span>
+        <footer class="mt-3 text-[10px] text-slate-400 no-print flex justify-between items-center">
+            <div class="flex gap-4 items-center">
+                <span class="flex items-center gap-1 font-bold text-indigo-500"><i data-lucide="check-circle" class="w-3 h-3"></i> 雲端自動存檔已啟動</span>
+                <span class="admin-only font-bold text-indigo-600 tracking-widest uppercase">● 管理模式</span>
+            </div>
+            <div class="flex gap-4 items-center">
+                <span>© 原點數位科技</span>
+                <span id="modifyTime" class="opacity-60 italic">同步時間：載入中...</span>
             </div>
         </footer>
     </div>
 
-    <!-- 管理者核對專區 (強制置中且可拖動) -->
+    <!-- 管理者核對專區 (可拖動) -->
     <div id="vacationModal" class="bg-white rounded-xl shadow-2xl w-[560px] hidden no-print overflow-hidden border border-slate-300 fixed">
         <div class="modal-header bg-slate-800 p-3 flex items-center justify-between text-white draggable-handle" id="vacationModalHeader">
-            <h3 class="text-xs font-bold flex items-center gap-2">
-                <i data-lucide="shield" class="w-4 h-4 text-emerald-400"></i> 管理者核對專區
-            </h3>
+            <h3 class="text-xs font-bold flex items-center gap-2"><i data-lucide="shield" class="w-4 h-4 text-emerald-400"></i> 管理者核對專區</h3>
             <div class="flex items-center gap-2">
-                <button onclick="openLogicSettings()" class="bg-indigo-500 hover:bg-indigo-400 px-2 py-1 rounded text-[10px] flex items-center gap-1 transition">
-                    <i data-lucide="file-cog" class="w-3 h-3"></i> 排班邏輯設定
-                </button>
+                <button onclick="openLogicSettings()" class="bg-indigo-500 hover:bg-indigo-400 px-2 py-1 rounded text-[10px] flex items-center gap-1 transition"><i data-lucide="cpu" class="w-3 h-3"></i> 排班邏輯設定</button>
                 <button onclick="closeVacationModal()" class="hover:bg-slate-700 p-1 rounded transition"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
         </div>
-        
         <div class="p-4 flex flex-col gap-4">
             <div class="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-lg border">
-                <div>
-                    <label class="text-[9px] text-slate-400 block mb-1 font-bold uppercase">開始日期</label>
-                    <input type="date" id="vacationStart" class="w-full border rounded p-1 text-xs outline-none">
-                </div>
-                <div>
-                    <label class="text-[9px] text-slate-400 block mb-1 font-bold uppercase">結束日期</label>
-                    <input type="date" id="vacationEnd" class="w-full border rounded p-1 text-xs outline-none">
-                </div>
+                <div><label class="text-[9px] text-slate-400 block mb-1 font-bold uppercase">開始日期</label><input type="date" id="vacationStart" class="w-full border rounded p-1 text-xs outline-none"></div>
+                <div><label class="text-[9px] text-slate-400 block mb-1 font-bold uppercase">結束日期</label><input type="date" id="vacationEnd" class="w-full border rounded p-1 text-xs outline-none"></div>
                 <div class="col-span-2 flex gap-2 mt-2">
                     <button onclick="generateVacationList()" class="flex-1 bg-slate-700 text-white py-1.5 rounded text-xs font-bold hover:bg-slate-800 transition">查詢休假人員</button>
-                    <button onclick="prepareWeeklyReport()" class="flex-1 bg-indigo-600 text-white py-1.5 rounded text-xs font-bold hover:bg-indigo-700 flex items-center justify-center gap-1 transition">
-                        <i data-lucide="file-check-2" class="w-3.5 h-3.5"></i> 產出週排班確認頁
-                    </button>
+                    <button onclick="prepareWeeklyReport()" class="flex-1 bg-indigo-600 text-white py-1.5 rounded text-xs font-bold hover:bg-indigo-700 flex items-center justify-center gap-1 transition font-bold"><i data-lucide="file-check-2" class="w-3.5 h-3.5"></i> 產出週報表確認頁</button>
                 </div>
             </div>
+            <div id="vacationListContent" class="overflow-y-auto max-h-[300px] pr-1 space-y-2"></div>
+        </div>
+    </div>
 
-            <div id="vacationListContent" class="overflow-y-auto max-h-[300px] pr-1 space-y-2">
-                <p class="text-center text-slate-400 text-[10px] py-8">請選擇查詢範圍並點擊查詢</p>
+    <!-- 快速選取工具管理視窗 -->
+    <div id="toolManagerModal" class="fixed inset-0 modal-overlay hidden flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-300">
+            <div class="bg-slate-800 p-4 text-white flex justify-between items-center">
+                <h3 class="font-bold flex items-center gap-2"><i data-lucide="wrench" class="w-5 h-5 text-amber-400"></i> 管理快速選取工具</h3>
+                <button onclick="closeToolManager()"><i data-lucide="x"></i></button>
             </div>
-
-            <div class="flex justify-end gap-2 border-t pt-3">
-                <button id="printVacationBtn" onclick="printVacationList()" class="px-3 py-1.5 bg-slate-800 text-white rounded text-xs font-bold hidden transition active:scale-95">列印此清單</button>
+            <div class="p-6">
+                <div class="max-h-60 overflow-y-auto mb-4 border rounded p-2 bg-slate-50">
+                    <div id="toolList" class="space-y-2"></div>
+                </div>
+                <div class="p-4 bg-slate-100 rounded-lg border">
+                    <p class="text-[10px] font-bold text-slate-400 mb-2 uppercase">新增工具項目</p>
+                    <div class="flex gap-2">
+                        <input id="newToolLabel" placeholder="代碼/標籤" class="flex-1 border rounded p-2 text-xs outline-none">
+                        <select id="newToolColor" class="border rounded p-2 text-xs bg-white">
+                            <option value="bg-slate-100 text-slate-600">灰色 (清除)</option>
+                            <option value="bg-rose-100 text-rose-600">紅色 (休假)</option>
+                            <option value="bg-amber-100 text-amber-700">橘色 (特休)</option>
+                            <option value="bg-blue-100 text-blue-700">藍色 (補休)</option>
+                            <option value="bg-indigo-100 text-indigo-700">紫色 (上班)</option>
+                            <option value="bg-emerald-100 text-emerald-700">綠色 (支援)</option>
+                        </select>
+                        <button onclick="addNewTool()" class="bg-indigo-600 text-white px-4 py-2 rounded text-xs font-bold transition active:scale-95">新增</button>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button onclick="saveToolsToCloud()" class="bg-emerald-600 text-white px-8 py-2 rounded font-bold text-sm shadow-lg hover:bg-emerald-700 transition active:scale-95">確認並儲存工具列</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- 排班邏輯設定視窗 (進階版) -->
+    <!-- 排班邏輯設定視窗 -->
     <div id="logicSettingsModal" class="fixed inset-0 modal-overlay hidden flex items-center justify-center p-4 no-print">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl overflow-hidden border border-slate-300">
             <div class="bg-slate-800 p-4 text-white flex justify-between items-center">
@@ -248,59 +234,33 @@
                 <button onclick="closeLogicSettings()"><i data-lucide="x"></i></button>
             </div>
             <div class="p-6">
-                <div class="overflow-x-auto max-h-[400px] border rounded">
+                <div class="overflow-x-auto max-h-[400px] border rounded mb-6">
                     <table class="w-full text-xs text-left">
-                        <thead>
-                            <tr class="bg-slate-100 font-bold border-b text-slate-600 uppercase tracking-tighter">
-                                <th class="p-3 border">班別</th>
-                                <th class="p-3 border">代碼</th>
-                                <th class="p-3 border">適用人員</th>
-                                <th class="p-3 border">報表時段</th>
-                                <th class="p-3 border">主崗位</th>
-                                <th class="p-3 border">副崗位</th>
-                                <th class="p-3 border text-center">操作</th>
-                            </tr>
-                        </thead>
+                        <thead><tr class="bg-slate-100 font-bold border-b text-slate-600 uppercase">
+                            <th class="p-3 border">班別</th><th class="p-3 border">代碼</th><th class="p-3 border">適用人員</th><th class="p-3 border">報表時段</th><th class="p-3 border">主崗位</th><th class="p-3 border">副崗位</th><th class="p-3 border text-center">操作</th>
+                        </tr></thead>
                         <tbody id="logicListBody"></tbody>
                     </table>
                 </div>
-
-                <!-- 新增區域 -->
-                <div class="mt-6 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100">
-                    <p class="text-[10px] font-bold text-indigo-400 mb-3 uppercase tracking-widest">新增邏輯設定</p>
-                    <div id="addLogicContainer" class="grid grid-cols-6 gap-3 items-end">
-                        <!-- 動態渲染欄位 -->
-                    </div>
-                    <div class="mt-4 flex justify-end">
-                        <button onclick="addLogicRow()" class="bg-indigo-600 text-white px-8 py-2 rounded text-xs font-bold transition active:scale-95 hover:bg-indigo-700 shadow-sm flex items-center gap-2">
-                            <i data-lucide="plus-circle" class="w-4 h-4"></i> 新增此設定
-                        </button>
-                    </div>
-                </div>
-                
+                <div id="addLogicContainer" class="grid grid-cols-6 gap-3 items-end p-4 bg-indigo-50/50 rounded-xl border border-indigo-100"></div>
                 <div class="mt-8 flex justify-end gap-3 border-t pt-4">
-                    <button onclick="closeLogicSettings()" class="px-6 py-2 rounded text-slate-500 hover:bg-slate-100 text-sm">取消返回</button>
-                    <button onclick="saveLogic()" class="bg-emerald-600 text-white px-8 py-2 rounded font-bold text-sm shadow-lg hover:bg-emerald-700 transition active:scale-95 flex items-center gap-2">
-                        <i data-lucide="save" class="w-4 h-4"></i> 儲存所有設定至雲端
-                    </button>
+                    <button onclick="addLogicRow()" class="bg-indigo-600 text-white px-8 py-2 rounded font-bold text-sm shadow-md transition active:scale-95">新增邏輯項目</button>
+                    <button onclick="saveLogicToCloud()" class="bg-emerald-600 text-white px-8 py-2 rounded font-bold text-sm shadow-lg hover:bg-emerald-700 transition active:scale-95">儲存並套用</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 週排班確認/編輯互動頁面 -->
+    <!-- 週報表確認頁面 -->
     <div id="weeklyConfirmView" class="fixed inset-0 bg-white hidden z-[150] overflow-y-auto">
         <div class="sticky top-0 bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg no-print">
-            <div>
-                <h2 class="text-lg font-bold">週人力安排報表 - 最終確認與編輯</h2>
-                <p class="text-[10px] text-slate-400">提示：點擊任何單元格可修改內容。完成後請點擊「確認並存檔」。</p>
-            </div>
+            <div><h2 class="text-lg font-bold">週人力安排表 - 編輯核對</h2><p class="text-[10px] text-slate-400">點擊單元格可修改內容。完成後請點擊「存檔」。</p></div>
             <div class="flex gap-3">
-                <button onclick="closeWeeklyConfirm()" class="bg-slate-700 px-4 py-2 rounded text-sm font-medium hover:bg-slate-600 transition">返回底稿</button>
+                <button onclick="closeWeeklyConfirm()" class="bg-slate-700 px-4 py-2 rounded text-sm font-medium hover:bg-slate-600 transition">返回修改</button>
                 <button onclick="saveWeeklyToDatabase()" class="bg-indigo-600 px-6 py-2 rounded text-sm font-bold hover:bg-indigo-500 shadow-lg flex items-center gap-2 transition active:scale-95">
-                    <i data-lucide="cloud-upload" class="w-4 h-4"></i> 確認並存檔
+                    <i data-lucide="cloud-upload" class="w-4 h-4"></i> 確認並存檔雲端
                 </button>
-                <button onclick="window.print()" class="bg-slate-100 text-slate-900 px-6 py-2 rounded text-sm font-bold shadow-lg hover:bg-white transition active:scale-95">列印 A4</button>
+                <button onclick="window.print()" class="bg-slate-100 text-slate-900 px-6 py-2 rounded text-sm font-bold shadow-lg hover:bg-white transition">列印 A4</button>
             </div>
         </div>
         <div id="weeklyConfirmContent" class="weekly-confirm-grid"></div>
@@ -309,11 +269,24 @@
     <!-- 登入視窗 -->
     <div id="loginModal" class="fixed inset-0 modal-overlay hidden flex items-center justify-center no-print">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-64 text-center">
-            <h3 class="text-sm font-bold mb-4 text-slate-800 uppercase tracking-widest">管理者登入</h3>
-            <input type="password" id="adminPassword" class="w-full border rounded-lg px-3 py-2 text-sm mb-4 outline-none focus:ring-2 focus:ring-indigo-500" placeholder="輸入密碼...">
+            <h3 class="text-sm font-bold mb-4 uppercase tracking-widest text-slate-800">管理者登入</h3>
+            <input type="password" id="adminPassword" class="w-full border rounded-lg px-3 py-2 text-sm mb-4 outline-none focus:ring-2 focus:ring-indigo-500 text-center" placeholder="密碼...">
             <div class="flex justify-center gap-2">
-                <button onclick="closeLogin()" class="px-4 py-1.5 text-slate-400 hover:bg-slate-50 rounded-lg text-xs">取消</button>
-                <button onclick="verifyPassword()" class="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold transition active:scale-95">確定</button>
+                <button onclick="closeLogin()" class="px-4 py-1.5 text-slate-400 text-xs font-bold hover:bg-slate-50 rounded transition">取消</button>
+                <button onclick="verifyPassword()" class="px-4 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold transition active:scale-95">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 備註視窗 -->
+    <div id="holidayModal" class="fixed inset-0 modal-overlay hidden flex items-center justify-center no-print">
+        <div class="bg-white p-5 rounded-xl shadow-xl w-80">
+            <h3 class="text-base font-bold mb-2 text-slate-800">節慶備註</h3>
+            <p id="holidayModalDate" class="text-[10px] text-slate-400 mb-2 font-bold"></p>
+            <textarea id="holidayInput" class="w-full border rounded-lg p-2 text-xs h-24 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="輸入特殊活動..."></textarea>
+            <div class="flex justify-end gap-2 mt-4">
+                <button onclick="closeHolidayModal()" class="px-3 py-1.5 text-slate-500 text-xs">取消</button>
+                <button onclick="saveHolidayRemark()" class="px-4 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold">儲存備註</button>
             </div>
         </div>
     </div>
@@ -321,14 +294,7 @@
     <script>
         let currentYear = 2026, currentMonth = 1; 
         let isAdmin = false, selectedTool = "", requiredStaffCount = 15;
-        let historyStack = [], redoStack = [];
-        let editLogicIndex = -1; 
-
-        let shiftLogic = [
-            { group: "早班", code: "08", person: "ALL", time: "08:00 - 16:30", posMain: "機", posSub: "" },
-            { group: "早班", code: "10", person: "ALL", time: "10:00 - 18:30", posMain: "拉", posSub: "" }
-        ]; 
-
+        let schedule = {}, holidayRemarks = {}, shiftLogic = [], editLogicIndex = -1;
         let staffGroups = [
             { group: "早班", members: ["黃詩涵", "劉芸汶", "林詩涵"] },
             { group: "中班", members: ["賴彥廷", "莊秉豐", "黃靖雯", "呂佳霖"] },
@@ -336,326 +302,281 @@
             { group: "夜班", members: ["黃品睿", "王楷翔", "施孟均"] }
         ];
 
-        const baseHolidays = { "2026-02-16": "除夕", "2026-02-17": "初一", "2026-02-18": "初二", "2026-02-19": "初三", "2026-02-20": "初四", "2026-02-21": "初五", "2026-02-28": "228" };
-        let holidayRemarks = { "2026-02-03": "拜拜" };
-        let schedule = {
-            "2026-02-01": {"劉芸汶":"休","賴彥廷":"休","賴信吉":"休","黃品睿":"休"},
-            "2026-02-02": {"林詩涵":"休","莊秉豐":"休","莊雅筑":"休","王楷翔":"休"},
-            "2026-02-03": {"黃詩涵":"休","黃靖雯":"休","呂佳霖":"休","柏政權":"休","施孟均":"休"},
-            "2026-02-16": {"黃詩涵":"08","劉芸汶":"08","林詩涵":"休","賴彥廷":"休","莊秉豐":"休","黃靖雯":"休","呂佳霖":"休","莊雅筑":"休","賴信吉":"休","柏政權":"休","王楷翔":"休","施孟均":"休"},
-            "2026-02-17": {"黃詩涵":"08","劉芸汶":"08","林詩涵":"特","賴彥廷":"1430","莊秉豐":"休","黃靖雯":"1230","賴信吉":"休"}
-        };
-
+        // 預設快速選取工具
         let shiftTypes = [
-            { id: "CLEAR", label: "清除", color: "bg-slate-100 text-slate-600", fixed: true },
-            { id: "休", label: "休", color: "bg-rose-100 text-rose-600" },
-            { id: "特", label: "特", color: "bg-amber-100 text-amber-700" },
-            { id: "補", label: "補", color: "bg-blue-100 text-blue-700" },
-            { id: "離職", label: "離職", color: "bg-slate-200 text-slate-400" }
+            { id: "CLEAR", label: "清除", color: "bg-slate-100 text-slate-600" }, 
+            { id: "休", label: "休", color: "bg-rose-100 text-rose-600" }, 
+            { id: "特", label: "特", color: "bg-amber-100 text-amber-700" }, 
+            { id: "補", label: "補", color: "bg-blue-100 text-blue-700" }
         ];
 
+        const TW_HOLIDAYS_2026 = { "2026-01-01": "元旦", "2026-02-16": "除夕", "2026-02-17": "初一", "2026-02-18": "初二", "2026-02-19": "初三", "2026-02-20": "初四", "2026-02-21": "初五", "2026-02-28": "228和平紀念日", "2026-04-04": "兒童節", "2026-04-05": "清明節", "2026-05-01": "勞動節", "2026-06-19": "端午節", "2026-09-25": "中秋節", "2026-10-10": "國慶日" };
+        const LUNAR_EVENTS_2026 = { "2026-02-18": "初二", "2026-03-04": "十六", "2026-03-20": "初二", "2026-04-03": "十六", "2026-04-18": "初二", "2026-05-02": "十六", "2026-05-18": "初二", "2026-06-01": "十六", "2026-06-16": "初二", "2026-06-30": "十六", "2026-07-15": "初二", "2026-07-29": "十六", "2026-08-14": "初二", "2026-08-28": "十六", "2026-09-12": "初二", "2026-09-26": "十六", "2026-10-12": "初二", "2026-10-26": "十六", "2026-11-10": "初二", "2026-11-24": "十六", "2026-12-10": "初二", "2026-12-24": "十六" };
+
+        let saveTimeout = null;
         const TIME_OPTIONS = ["08:00 - 16:30","10:00 - 18:30","12:30 - 21:00","14:30 - 23:00","15:30 - 00:00","17:30 - 02:00","18:30 - 03:00","21:00 - 05:30","23:50 - 08:20"];
         const POS_MAIN_OPTIONS = ["機","拉","A下","A上","B","櫃結","外B","消毒"];
         const POS_SUB_OPTIONS = ["機","拉","A下","B","櫃結","外B","B結"];
 
-        function init() {
-            renderToolbar(); renderMonthlyTable(); 
-            makeDraggable(document.getElementById('vacationModal'), document.getElementById('vacationModalHeader'));
-            lucide.createIcons();
-            saveHistory();
+        function init() { 
+            makeDraggable(document.getElementById('vacationModal'), document.getElementById('vacationModalHeader')); 
+            lucide.createIcons(); 
         }
 
-        function makeDraggable(el, h) {
-            let x=0,y=0,mx=0,my=0;
-            h.onmousedown = (e) => {
-                e.preventDefault(); mx=e.clientX; my=e.clientY;
-                document.onmouseup = () => { document.onmouseup=null; document.onmousemove=null; };
-                document.onmousemove = (e) => {
-                    e.preventDefault(); x=mx-e.clientX; y=my-e.clientY; mx=e.clientX; my=e.clientY;
-                    el.style.top = (el.offsetTop-y)+"px"; el.style.left = (el.offsetLeft-x)+"px";
-                };
-            };
-        }
+        function getSafeDateStr(y, m, d) { return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`; }
 
-        function getOptions(list, selectedValue) {
-            return list.map(v => `<option value="${v}" ${v === selectedValue ? 'selected' : ''}>${v}</option>`).join('');
-        }
-
-        function getStaffOptions(selectedValue) {
-            let options = `<option value="ALL" ${selectedValue === 'ALL' ? 'selected' : ''}>-- 全體適用 --</option>`;
-            staffGroups.forEach(g => {
-                g.members.forEach(m => options += `<option value="${m}" ${selectedValue === m ? 'selected' : ''}>${m}</option>`);
-            });
-            return options;
-        }
-
-        // --- 排班邏輯設定 ---
-        function openLogicSettings() {
-            renderAddLogicForm();
-            renderLogicList();
-            document.getElementById('logicSettingsModal').classList.remove('hidden');
-        }
-
-        function renderAddLogicForm() {
-            const container = document.getElementById('addLogicContainer');
-            container.innerHTML = `
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">班別分組</label><select id="logicGroup" class="w-full border rounded px-2 py-2 text-xs outline-none bg-white">${getOptions(["早班","中班","晚班","夜班"], "")}</select></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">排班代碼</label><input id="logicCode" placeholder="如 08" class="w-full border rounded px-2 py-2 text-xs outline-none bg-white"></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">適用人員</label><select id="logicStaff" class="w-full border rounded px-2 py-2 text-xs outline-none bg-white">${getStaffOptions("ALL")}</select></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">正式時段</label><select id="logicTime" class="w-full border rounded px-2 py-2 text-xs outline-none bg-white">${getOptions(TIME_OPTIONS, "")}</select></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">主崗位</label><select id="logicPosMain" class="w-full border rounded px-2 py-2 text-xs outline-none bg-white"><option value="">無</option>${getOptions(POS_MAIN_OPTIONS, "")}</select></div>
-                <div><label class="text-[9px] font-bold text-slate-500 mb-1 block">副崗位</label><select id="logicPosSub" class="w-full border rounded px-2 py-2 text-xs outline-none bg-white"><option value="">無</option>${getOptions(POS_SUB_OPTIONS, "")}</select></div>
-            `;
-        }
-
-        function renderLogicList() {
-            const body = document.getElementById('logicListBody');
-            body.innerHTML = shiftLogic.map((l, i) => {
-                if (editLogicIndex === i) {
-                    return `
-                        <tr class="bg-indigo-50/50">
-                            <td class="p-2 border"><select id="editGroup" class="w-full p-1 text-xs border rounded">${getOptions(["早班","中班","晚班","夜班"], l.group)}</select></td>
-                            <td class="p-2 border"><input id="editCode" value="${l.code}" class="w-full p-1 text-xs border rounded outline-none"></td>
-                            <td class="p-2 border"><select id="editStaff" class="w-full p-1 text-xs border rounded">${getStaffOptions(l.person)}</select></td>
-                            <td class="p-2 border"><select id="editTime" class="w-full p-1 text-xs border rounded">${getOptions(TIME_OPTIONS, l.time)}</select></td>
-                            <td class="p-2 border"><select id="editPosMain" class="w-full p-1 text-xs border rounded"><option value="">無</option>${getOptions(POS_MAIN_OPTIONS, l.posMain)}</select></td>
-                            <td class="p-2 border"><select id="editPosSub" class="w-full p-1 text-xs border rounded"><option value="">無</option>${getOptions(POS_SUB_OPTIONS, l.posSub)}</select></td>
-                            <td class="p-2 border text-center">
-                                <div class="flex gap-2 justify-center">
-                                    <button onclick="confirmEditLogic(${i})" class="text-emerald-600 hover:bg-emerald-100 p-1 rounded transition"><i data-lucide="check-circle" class="w-4 h-4"></i></button>
-                                    <button onclick="cancelEditLogic()" class="text-slate-400 hover:bg-slate-100 p-1 rounded transition"><i data-lucide="x-circle" class="w-4 h-4"></i></button>
-                                </div>
-                            </td>
-                        </tr>`;
-                } else {
-                    return `
-                        <tr class="border-b hover:bg-slate-50 transition text-[11px]">
-                            <td class="p-3 border text-slate-500">${l.group}</td>
-                            <td class="p-3 border font-bold text-indigo-600">${l.code}</td>
-                            <td class="p-3 border">${l.person === 'ALL' ? '<span class="text-slate-400 italic">全體適用</span>' : l.person}</td>
-                            <td class="p-3 border">${l.time}</td>
-                            <td class="p-3 border font-bold">${l.posMain || '-'}</td>
-                            <td class="p-3 border text-slate-400">${l.posSub || '-'}</td>
-                            <td class="p-3 border text-center">
-                                <div class="flex gap-2 justify-center">
-                                    <button onclick="startEditLogic(${i})" class="text-indigo-400 hover:text-indigo-600 p-1 rounded hover:bg-indigo-50 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                                    <button onclick="removeLogic(${i})" class="text-rose-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                </div>
-                            </td>
-                        </tr>`;
-                }
-            }).join('');
-            lucide.createIcons();
-        }
-
-        function startEditLogic(i) { editLogicIndex = i; renderLogicList(); }
-        function cancelEditLogic() { editLogicIndex = -1; renderLogicList(); }
-        function confirmEditLogic(i) {
-            shiftLogic[i] = {
-                group: document.getElementById('editGroup').value,
-                code: document.getElementById('editCode').value.trim(),
-                person: document.getElementById('editStaff').value,
-                time: document.getElementById('editTime').value,
-                posMain: document.getElementById('editPosMain').value,
-                posSub: document.getElementById('editPosSub').value
-            };
-            editLogicIndex = -1;
-            renderLogicList();
-        }
-
-        function closeLogicSettings() { editLogicIndex = -1; document.getElementById('logicSettingsModal').classList.add('hidden'); }
-        function addLogicRow() {
-            const group = document.getElementById('logicGroup').value, code = document.getElementById('logicCode').value.trim(), person = document.getElementById('logicStaff').value, time = document.getElementById('logicTime').value, posMain = document.getElementById('logicPosMain').value, posSub = document.getElementById('logicPosSub').value;
-            if(!code) return alert("請輸入排班代碼");
-            shiftLogic.push({ group, code, person, time, posMain, posSub });
-            document.getElementById('logicCode').value = '';
-            renderLogicList();
-        }
-        function removeLogic(i) { shiftLogic.splice(i, 1); renderLogicList(); }
-        
-        async function saveLogic() {
-            if(!window.db || !window.auth.currentUser) return alert("權限不足");
+        // --- 核心：雲端載入 ---
+        window.loadGlobalState = async () => {
+            if(!window.auth.currentUser) return;
+            const path = (c) => `artifacts/${window.appId}/public/data/${c}`;
             try {
-                const settingsRef = window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'settings', 'shiftLogic');
-                await window.fbSetDoc(settingsRef, { data: shiftLogic });
-                alert("雲端同步成功！已更新排班比對邏輯。");
-            } catch(e) { alert("儲存失敗: " + e.message); }
-        }
+                const sSnap = await window.fbGetDoc(window.fbDoc(window.db, path('main_schedule'), 'current'));
+                if(sSnap.exists()) schedule = sSnap.data().schedule || {};
+                const pSnap = await window.fbGetDoc(window.fbDoc(window.db, path('personnel_config'), 'current'));
+                if(pSnap.exists()) { staffGroups = pSnap.data().staffGroups || staffGroups; requiredStaffCount = pSnap.data().requiredStaffCount || 15; document.getElementById('leaveSummary').value = pSnap.data().leaveSummary || "4例4休6國"; }
+                const hSnap = await window.fbGetDoc(window.fbDoc(window.db, path('holiday_remarks'), 'current'));
+                if(hSnap.exists()) holidayRemarks = hSnap.data().remarks || {};
+                const lSnap = await window.fbGetDoc(window.fbDoc(window.db, path('logic'), 'current'));
+                if(lSnap.exists()) shiftLogic = lSnap.data().data || [];
+                const tSnap = await window.fbGetDoc(window.fbDoc(window.db, path('toolbar_settings'), 'current'));
+                if(tSnap.exists()) shiftTypes = tSnap.data().data || shiftTypes;
 
-        window.loadSettings = async () => {
-            if(!window.db || !window.auth.currentUser) return;
-            try {
-                const querySnapshot = await window.fbGetDocs(window.fbCollection(window.db, 'artifacts', window.appId, 'public', 'data', 'settings'));
-                querySnapshot.forEach((doc) => { if(doc.id === 'shiftLogic') shiftLogic = doc.data().data; });
-            } catch(e) { console.error("Settings load error", e); }
+                renderToolbar();
+                renderMonthlyTable();
+                document.getElementById('modifyTime').innerText = `${new Date().toLocaleTimeString()}`;
+            } catch(e) { console.error(e); }
         };
 
-        // --- 產出週排班互動頁面 (完美還原格式) ---
-        function prepareWeeklyReport() {
-            const startStr = document.getElementById('vacationStart').value;
-            if(!startStr) return alert("請先選擇週報表起始日期");
-            const content = document.getElementById('weeklyConfirmContent');
-            content.innerHTML = '';
-            const startDate = new Date(startStr);
-
-            for(let i=0; i<6; i++) {
-                let d = new Date(startDate); d.setDate(d.getDate() + i);
-                let ds = d.toISOString().split('T')[0], dd = schedule[ds] || {};
-                let morningCount=0, midCount=0, nightCount=0;
-                let rowsHtml = "";
-
-                staffGroups.forEach(g => {
-                    g.members.forEach(m => {
-                        const code = dd[m];
-                        if (!code || ["休","特","補","離職"].includes(code)) return;
-                        let logic = shiftLogic.find(l => l.code === code && l.person === m) || shiftLogic.find(l => l.code === code && l.person === 'ALL');
-                        if (logic) {
-                            if(logic.group === "早班") morningCount++; else if(logic.group === "夜班") nightCount++; else midCount++;
-                            let posText = logic.posMain + (logic.posSub ? `(${logic.posSub})` : '');
-                            rowsHtml += `<tr><td class="text-center font-bold">${logic.time}</td><td contenteditable="true" class="editable-cell font-bold text-center">${m.slice(-1)}</td><td contenteditable="true" class="editable-cell text-center">${posText}</td><td class="text-center font-bold">${logic.group === "早班" ? morningCount : ''}</td><td class="text-center font-bold">${logic.group === "中班" || logic.group === "晚班" ? midCount : ''}</td><td class="text-center font-bold">${logic.group === "夜班" ? nightCount : ''}</td></tr>`;
-                        }
-                    });
-                });
-
-                let currentRowCount = (rowsHtml.match(/<tr/g) || []).length;
-                for(let r=0; r < (11-currentRowCount); r++) rowsHtml += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
-
-                const off = Object.keys(dd).filter(n => ["休","特","補"].includes(dd[n])).map(n => n.slice(-1)).join('、');
-                content.innerHTML += `<div class="day-card-container" data-date="${ds}"><div class="report-day-title">${d.getMonth()+1}/${d.getDate()} (週${["日","一","二","三","四","五","六"][d.getDay()]})</div><table class="report-table-final"><tr class="report-header"><td>班別</td><td>上班人員</td><td>崗位</td><td>早班</td><td>中班</td><td>晚班</td></tr>${rowsHtml}</table><div class="mt-2 text-[10px] flex justify-between px-1"><span class="font-bold">休假人員：<span contenteditable="true" class="editable-cell font-bold text-rose-600 underline">${off || '無'}</span></span><span class="font-bold">發券：<span contenteditable="true" class="editable-cell">_______</span></span></div></div>`;
-            }
-
-            document.getElementById('weeklyConfirmView').classList.remove('hidden');
-            lucide.createIcons();
+        function triggerAutoSave() {
+            if(saveTimeout) clearTimeout(saveTimeout);
+            document.getElementById('syncBadge').style.display = 'flex';
+            saveTimeout = setTimeout(async () => {
+                await performCloudSave();
+                document.getElementById('syncBadge').style.display = 'none';
+            }, 1000);
         }
 
-        async function saveWeeklyToDatabase() {
-            if(!window.db || !window.auth.currentUser) return alert("連線錯誤");
-            const weeklyData = Array.from(document.querySelectorAll('.day-card-container')).map(card => ({ date: card.getAttribute('data-date'), html: card.innerHTML }));
+        async function performCloudSave() {
+            if(!window.auth.currentUser) return;
+            const path = (c) => `artifacts/${window.appId}/public/data/${c}`;
             try {
-                await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'weekly_reports', `week_${weeklyData[0].date}`), { createdAt: new Date().toISOString(), data: weeklyData });
-                alert("週排班報表已成功永久儲存於雲端資料庫！");
-            } catch(e) { alert("存檔失敗: " + e.message); }
+                await window.fbSetDoc(window.fbDoc(window.db, path('main_schedule'), 'current'), { schedule });
+                await window.fbSetDoc(window.fbDoc(window.db, path('personnel_config'), 'current'), { staffGroups, requiredStaffCount, leaveSummary: document.getElementById('leaveSummary').value });
+                await window.fbSetDoc(window.fbDoc(window.db, path('holiday_remarks'), 'current'), { remarks: holidayRemarks });
+                document.getElementById('modifyTime').innerText = `${new Date().toLocaleTimeString()}`;
+            } catch(e) { console.error(e); }
         }
 
-        function closeWeeklyConfirm() { document.getElementById('weeklyConfirmView').classList.add('hidden'); }
-
-        // --- 管理者基礎功能 ---
-        function toggleAdmin() { 
-            if(isAdmin){ isAdmin=false; document.body.classList.remove('is-admin'); document.getElementById('adminIcon').setAttribute('data-lucide','lock'); renderMonthlyTable(); }
-            else { document.getElementById('loginModal').classList.remove('hidden'); document.getElementById('adminPassword').focus(); }
-        }
-        function verifyPassword() { 
-            if(document.getElementById('adminPassword').value==="1234"){ isAdmin=true; document.body.classList.add('is-admin'); document.getElementById('adminIcon').setAttribute('data-lucide','unlock'); closeLogin(); renderMonthlyTable(); }
-            else alert("密碼錯誤");
-        }
-        function closeLogin(){ document.getElementById('loginModal').classList.add('hidden'); document.getElementById('adminPassword').value=''; }
-        
-        function openVacationModal() { 
-            const m = document.getElementById('vacationModal'); 
-            m.classList.remove('hidden'); 
-            
-            const centerX = (window.innerWidth - m.offsetWidth) / 2;
-            const centerY = (window.innerHeight - m.offsetHeight) / 2;
-            m.style.top = Math.max(20, centerY) + "px";
-            m.style.left = Math.max(20, centerX) + "px";
-
-            document.getElementById('vacationStart').value = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-01`;
-            document.getElementById('vacationEnd').value = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-07`;
-            lucide.createIcons();
-        }
-        function closeVacationModal() { document.getElementById('vacationModal').classList.add('hidden'); }
-        function saveHistory() { const now = new Date(); document.getElementById('versionLabel').innerText=`版本：v${now.getFullYear().toString().slice(-2)}.${now.getMonth()+1}.${now.getDate()}.${now.getHours()}`; document.getElementById('modifyTime').innerText=`最後修改：${now.toLocaleString()}`; }
-
+        // --- 渲染 ---
         function renderMonthlyTable() {
             const daysCount=getDaysInMonth(currentYear,currentMonth), head=document.getElementById('tableHead'), body=document.getElementById('tableBody');
             document.getElementById('monthDisplay').innerText=`${currentYear}年 ${currentMonth+1}月`;
             const totalS = staffGroups.reduce((a,b)=>a+b.members.length,0);
-            
-            let h1=`<tr class="bg-slate-50">
-                        <th colspan="2" class="sticky-col bg-slate-50 text-rose-500 font-bold border-b-2">節慶/星期</th>`;
-            let h2=`<tr class="bg-slate-100">
-                        <th class="shift-group-col border-b-2">班別</th>
-                        <th class="name-col-sticky border-b-2">
-                            <div class="staff-count-box">
-                                <b>姓名</b>
-                                <span>應有:<input value="${requiredStaffCount}" class="staff-count-input" onchange="updateRequiredStaff(this.value)" ${!isAdmin?'readonly':''}></span>
-                                <span>現有:${totalS}</span>
-                            </div>
-                        </th>`;
+            const shortfall = Math.max(0, requiredStaffCount - totalS);
+            const getWeather = (date) => { const m = date.getMonth(), d = date.getDate(), s = (m * 31 + d) % 10; return m <= 2 || m >= 10 ? (s < 3 ? {label:"雨",color:"text-blue-400"} : s < 7 ? {label:"冷",color:"text-indigo-500"} : {label:"暖",color:"text-orange-400"}) : (s < 2 ? {label:"雨",color:"text-blue-400"} : s < 8 ? {label:"晴",color:"text-amber-500"} : {label:"暖",color:"text-rose-500"}); };
+
+            let hW = `<tr class="bg-slate-50"><th rowspan="4" class="shift-group-col border-b-2">班別</th><th rowspan="4" class="name-col-sticky border-b-2">
+                <div class="staff-count-box w-full">
+                    <div class="font-bold text-[10px] text-slate-800 mb-1 border-b border-slate-300 pb-0.5">人力編制</div>
+                    <div class="flex justify-between items-center text-[9px] px-1"><span>應有</span><input value="${requiredStaffCount}" class="staff-count-input" onchange="updateRequiredStaff(this.value)" ${!isAdmin?'readonly':''}></div>
+                    <div class="flex justify-between items-center text-[9px] px-1"><span>現有</span><span class="font-bold text-indigo-600">${totalS}</span></div>
+                    <div class="flex justify-between items-center text-[9px] px-1"><span>待補</span><span class="font-bold ${shortfall > 0 ? 'text-rose-500' : 'text-slate-400'}">${shortfall}</span></div>
+                </div>
+            </th><th class="bg-slate-50 text-[9px] text-slate-400 border-b">天氣</th>`;
+            let hF = `<tr class="bg-slate-50"><th class="bg-slate-50 text-[9px] text-rose-500 font-bold border-b">節慶</th>`;
+            let hK = `<tr class="bg-slate-50"><th class="bg-slate-50 text-[9px] text-slate-400 border-b">星期</th>`;
+            let h2 = `<tr class="bg-slate-100"><th class="border-b-2 font-bold text-[9px]">日期</th>`;
             
             for(let d=1; d<=daysCount; d++) {
-                let date=new Date(currentYear,currentMonth,d), ds=date.toISOString().split('T')[0], isW=(date.getDay()===0||date.getDay()===6);
-                let weekName = ["日","一","二","三","四","五","六"][date.getDay()];
-                h1+=`<th class="${isW?'weekend-text':''} text-[9px] cursor-pointer" onclick="openHolidayModal('${ds}')">
-                        <div class="flex flex-col"><span>${holidayRemarks[ds]||baseHolidays[ds]||''}</span><span class="opacity-50 font-normal">(${weekName})</span></div>
-                     </th>`;
-                h2+=`<th class="${isW?'weekend-text':''}">${d}</th>`;
+                let date=new Date(currentYear,currentMonth,d), ds=getSafeDateStr(currentYear, currentMonth, d), isW=(date.getDay()===0||date.getDay()===6), w = getWeather(date);
+                let fest = holidayRemarks[ds] || TW_HOLIDAYS_2026[ds] || LUNAR_EVENTS_2026[ds] || '';
+                hW += `<th class="${w.color} font-bold text-[9px] border-b">${w.label}</th>`;
+                hF += `<th class="weekend-text text-[9px] cursor-pointer border-b" onclick="openHolidayModal('${ds}')">${fest}</th>`;
+                hK += `<th class="${isW?'weekend-text':''} text-[9px] border-b font-normal">${["日","一","二","三","四","五","六"][date.getDay()]}</th>`;
+                h2 += `<th class="${isW?'weekend-text':''} border-b-2 font-bold text-center">${d}</th>`;
             }
-            head.innerHTML=h1+"<th class='bg-slate-50'></th></tr>"+h2+"<th class='bg-slate-100 text-[9px] text-center'>共休</th></tr>";
+            head.innerHTML = hW + `<th class="bg-slate-50 border-b"></th></tr>` + hF + `<th class="bg-slate-50 border-b"></th></tr>` + hK + `<th class="bg-slate-50 border-b"></th></tr>` + h2 + `<th class='bg-slate-100 text-[9px] text-center border-b-2 font-bold'>共休</th></tr>`;
 
             let bHtml="";
             staffGroups.forEach((g,gi)=>{
                 g.members.forEach((n,mi)=>{
-                    let row=`<tr class="group-${g.group} hover:brightness-95 transition">`;
-                    if(mi===0) row+=`<td rowspan="${g.members.length}" class="shift-group-col"><span>${g.group}</span>${isAdmin?`<button onclick="addMember(${gi})" class="no-print bg-indigo-500 text-white rounded w-3 h-3 flex items-center justify-center mx-auto mt-1 transition active:scale-90"><i data-lucide="plus" class="w-2 h-2"></i></button>`:''}</td>`;
+                    let row=`<tr class="group-${g.group} hover:bg-slate-50 transition">`;
+                    if(mi===0) row+=`<td rowspan="${g.members.length}" class="shift-group-col"><span>${g.group}</span>${isAdmin?`<button onclick="addMember(${gi})" class="no-print bg-indigo-500 text-white rounded w-3.5 h-3.5 flex items-center justify-center mx-auto mt-1 transition active:scale-90"><i data-lucide="plus" class="w-2 h-2"></i></button>`:''}</td>`;
                     row+=`<td class="name-col-sticky font-bold"><div class="flex items-center justify-center gap-1"><input value="${n}" class="name-input" onchange="updateMemberName(${gi},${mi},this.value)" ${!isAdmin?'readonly':''}>${isAdmin?`<button onclick="removeMember(${gi},${mi})" class="no-print text-slate-300 hover:text-rose-500 transition active:scale-90"><i data-lucide="minus-circle" class="w-2.5 h-2.5"></i></button>`:''}</div></td>`;
-                    
-                    let offCount = 0;
+                    let rowOff = 0;
                     for (let d=1; d<=daysCount; d++) {
-                        let ds=`${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, v=schedule[ds]?.[n]||"", isW=(new Date(currentYear,currentMonth,d).getDay()===0||new Date(currentYear,currentMonth,d).getDay()===6);
-                        const tool=shiftTypes.find(t=>t.id===v);
-                        if(["休","特","補"].includes(v)) offCount++;
-                        row+=`<td class="cursor-pointer hover:bg-white/50 transition ${tool?tool.color:''} ${isW&&!v?'holiday-bg':''}" onclick="applyTool('${ds}','${n}',${d})">${v==="休"?'<span class="font-bold text-rose-500">休</span>':v}</td>`;
+                        let ds=getSafeDateStr(currentYear, currentMonth, d), v=schedule[ds]?.[n]||"", isW=(new Date(currentYear,currentMonth,d).getDay()===0||new Date(currentYear,currentMonth,d).getDay()===6);
+                        const t=shiftTypes.find(x=>x.id===v); if(["休","特","補"].includes(v)) rowOff++;
+                        row+=`<td class="cursor-pointer hover:bg-white/50 transition ${t?t.color:''} ${isW&&!v?'holiday-bg':''}" onclick="applyTool('${ds}','${n}',${d})">${v==="休"?'<span class="font-bold text-rose-500">休</span>':v}</td>`;
                     }
-                    bHtml+=row+`<td class="font-bold bg-slate-50/50 text-[10px] text-center">${offCount}</td></tr>`;
+                    bHtml+=row+`<td class="font-bold bg-slate-50/50 text-[10px] text-center">${rowOff}</td></tr>`;
                 });
             });
             body.innerHTML = bHtml; lucide.createIcons();
         }
 
-        function generateVacationList() {
-            const s=document.getElementById('vacationStart').value, e=document.getElementById('vacationEnd').value;
-            if(!s||!e) return alert("請輸入日期");
-            let html="", startD=new Date(s), endD=new Date(e);
-            for(let d=new Date(startD); d<=endD; d.setDate(d.getDate()+1)) {
-                let ds=d.toISOString().split('T')[0], dd=schedule[ds]||{};
-                const list休=Object.keys(dd).filter(n=>dd[n]==="休"), list特=Object.keys(dd).filter(n=>dd[n]==="特"), list補=Object.keys(dd).filter(n=>dd[n]==="補");
-                if(list休.length||list特.length||list補.length){
-                    html+=`<div class="p-2 bg-white border rounded shadow-sm text-[10px]"><b class="text-indigo-600">${ds} (週${["日","一","二","三","四","五","六"][d.getDay()]})</b><div class="mt-1">${list休.length?`<span class="bg-rose-50 text-rose-600 px-1 mr-2 rounded font-bold border border-rose-100">休: ${list休.join(',')}</span>`:''} ${list特.length?`<span class="bg-amber-50 text-amber-600 px-1 mr-2 rounded font-bold border border-amber-100">特: ${list特.join(',')}</span>`:''} ${list補.length?`<span class="bg-blue-50 text-blue-600 px-1 rounded font-bold border border-blue-100">補: ${list補.join(',')}</span>`:''}</div></div>`;
-                }
-            }
-            document.getElementById('vacationListContent').innerHTML=html||'<p class="text-center text-xs py-4 text-slate-400 font-bold">此區間查無休假紀錄</p>';
-            document.getElementById('printVacationBtn').classList.toggle('hidden', !html);
+        // --- 快速選取工具管理邏輯 ---
+        function renderToolbar() {
+            const container = document.getElementById('toolbar');
+            if(!container) return;
+            container.innerHTML = shiftTypes.map(t => 
+                `<button onclick="selectTool('${t.id}')" id="tool-${t.id}" class="${t.color} px-3 py-1 rounded-lg text-[10px] font-bold shadow-sm transition-all active:scale-90 hover:brightness-95 border-2 border-transparent ${selectedTool === t.id ? 'active-tool' : ''}">
+                    ${t.label}
+                </button>`
+            ).join('');
         }
 
-        function updatePrintReport() {
-            const container = document.getElementById('reportGrid');
-            container.innerHTML = '';
-            const daysC = getDaysInMonth(currentYear, currentMonth);
-            for (let d = 1; d <= daysC; d++) {
-                let date = new Date(currentYear, currentMonth, d), dS = date.toISOString().split('T')[0], dayD = schedule[dS] || {};
-                const getW = (gn) => { const g = staffGroups.find(x => x.group === gn); return g ? g.members.filter(m => dayD[m] && !["休","特","補","離職"].includes(dayD[m]) && m !== '待補') : []; };
-                const morning = getW("早班"), afternoon = getW("中班"), evening = getW("晚班"), off = Object.keys(dayD).filter(m => ["休","特","補"].includes(dayD[m]));
-                container.innerHTML += `<div class="day-block"><div class="font-bold text-center border-b border-black pb-1">${currentMonth+1}/${d} (週${["日","一","二","三","四","五","六"][date.getDay()]})</div><table class="report-table text-[9px] font-bold"><tr class="bg-gray-100"><td>班別</td><td>人力安排</td><td>崗位</td><td>早班</td><td>中班</td><td>晚班</td></tr><tr><td>早班</td><td>${morning.join('、')}</td><td></td><td>${morning.length || ''}</td><td></td><td></td></tr><tr><td>中班</td><td>${afternoon.join('、')}</td><td></td><td></td><td>${afternoon.length || ''}</td><td></td></tr><tr><td>晚班</td><td>${evening.join('、')}</td><td></td><td></td><td></td><td>${evening.length || ''}</td></tr></table><div class="mt-2 text-[9px]">休假：${off.join('、') || '無'}</div></div>`;
-            }
+        function selectTool(id) {
+            selectedTool = id;
+            shiftTypes.forEach(t => {
+                const btn = document.getElementById(`tool-${t.id}`);
+                if (btn) btn.classList.toggle('active-tool', t.id === id);
+            });
         }
 
-        function printDailyReport() { updatePrintReport(); document.getElementById('reportPrintArea').classList.add('print-active'); document.getElementById('weeklyConfirmView').classList.remove('print-active'); window.print(); }
-        function printVacationList() { document.getElementById('vacationPrintArea').classList.add('print-active'); document.getElementById('reportPrintArea').classList.remove('print-active'); document.getElementById('vPrintTime').innerText = new Date().toLocaleString(); window.print(); }
-        function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
-        function changeMonth(o) { currentMonth+=o; if(currentMonth>11){currentMonth=0;currentYear++;} else if(currentMonth<0){currentMonth=11;currentYear--;} renderMonthlyTable(); }
-        function selectTool(id) { selectedTool=id; shiftTypes.forEach(t=>{ const b=document.getElementById(`tool-${t.id}`); if(b) b.classList.toggle('active-tool', t.id===id); }); }
-        function renderToolbar() { document.getElementById('toolbar').innerHTML=shiftTypes.map(t=>`<button onclick="selectTool('${t.id}')" id="tool-${t.id}" class="${t.color} px-2 py-0.5 rounded text-[10px] font-bold shadow-sm">${t.label}</button>`).join(''); selectTool(shiftTypes[1].id); }
-        function applyTool(ds,n,d) { if(!isAdmin && !["休","特","補","CLEAR"].includes(selectedTool)) return; if(!schedule[ds]) schedule[ds]={}; if(selectedTool==="CLEAR") delete schedule[ds][n]; else schedule[ds][n]=selectedTool; renderMonthlyTable(); }
+        function openToolManager() { renderToolList(); document.getElementById('toolManagerModal').classList.remove('hidden'); lucide.createIcons(); }
+        function closeToolManager() { document.getElementById('toolManagerModal').classList.add('hidden'); }
+        function renderToolList() {
+            const list = document.getElementById('toolList');
+            list.innerHTML = shiftTypes.map((t, i) => `
+                <div class="flex items-center justify-between p-2 mb-2 bg-white rounded border shadow-sm">
+                    <span class="${t.color} px-4 py-1.5 rounded text-xs font-bold">${t.label}</span>
+                    <button onclick="removeTool(${i})" class="text-rose-500 p-1 hover:bg-rose-50 rounded transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>`).join('');
+            lucide.createIcons();
+        }
+
+        function addNewTool() {
+            const label = document.getElementById('newToolLabel').value.trim();
+            const color = document.getElementById('newToolColor').value;
+            if(!label) return;
+            if(shiftTypes.find(t => t.id === label)) return alert("代碼已存在");
+            shiftTypes.push({ id: label, label, color });
+            document.getElementById('newToolLabel').value = '';
+            renderToolList();
+            renderToolbar(); // 立即同步顯示在前端預覽
+        }
+
+        function removeTool(i) {
+            shiftTypes.splice(i, 1);
+            renderToolList();
+            renderToolbar(); // 立即同步顯示在前端預覽
+        }
+
+        async function saveToolsToCloud() {
+            if(!window.auth.currentUser) return;
+            try {
+                await window.fbSetDoc(window.fbDoc(window.db, `artifacts/${window.appId}/public/data/toolbar_settings`, 'current'), { data: shiftTypes });
+                alert("快速選取列已儲存至雲端！");
+                renderToolbar();
+                closeToolManager();
+            } catch(e) { alert("儲存失敗"); }
+        }
+
+        // --- 排班邏輯 ---
+        function openLogicSettings() { renderAddLogicForm(); renderLogicList(); document.getElementById('logicSettingsModal').classList.remove('hidden'); }
+        function closeLogicSettings() { editLogicIndex = -1; document.getElementById('logicSettingsModal').classList.add('hidden'); }
+        function renderAddLogicForm() {
+            let o = `<option value="ALL">-- 全體 --</option>`; staffGroups.forEach(g=>g.members.forEach(m=>o+=`<option value="${m}">${m}</option>`));
+            document.getElementById('addLogicContainer').innerHTML = `
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1">班別</label><select id="logicGroup" class="w-full border rounded p-2 text-xs bg-white">${getOptions(["早班","中班","晚班","夜班"], "")}</select></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1">代碼</label><input id="logicCode" class="w-full border rounded p-2 text-xs bg-white outline-none"></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1">人員</label><select id="logicStaff" class="w-full border rounded p-2 text-xs bg-white">${o}</select></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1">時段</label><select id="logicTime" class="w-full border rounded p-2 text-xs bg-white">${getOptions(TIME_OPTIONS, "")}</select></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1">主崗</label><select id="logicPosMain" class="w-full border rounded p-2 text-xs bg-white"><option value="">無</option>${getOptions(POS_MAIN_OPTIONS, "")}</select></div>
+                <div><label class="text-[9px] font-bold text-slate-500 mb-1">副崗</label><select id="logicPosSub" class="w-full border rounded p-2 text-xs bg-white"><option value="">無</option>${getOptions(POS_SUB_OPTIONS, "")}</select></div>`;
+        }
+        function renderLogicList() {
+            const b = document.getElementById('logicListBody');
+            b.innerHTML = shiftLogic.map((l, i) => {
+                if(editLogicIndex === i) return `<tr class="bg-indigo-50"><td class="p-2 border"><select id="editGroup" class="text-xs">${getOptions(["早班","中班","晚班","夜班"], l.group)}</select></td><td class="p-2 border"><input id="editCode" value="${l.code}" class="w-full text-xs"></td><td class="p-2 border"><select id="editStaff" class="text-xs">${getStaffOptions(l.person)}</select></td><td class="p-2 border"><select id="editTime" class="text-xs">${getOptions(TIME_OPTIONS, l.time)}</select></td><td class="p-2 border"><select id="editPosMain" class="text-xs"><option value="">無</option>${getOptions(POS_MAIN_OPTIONS, l.posMain)}</select></td><td class="p-2 border"><select id="editPosSub" class="text-xs"><option value="">無</option>${getOptions(POS_SUB_OPTIONS, l.posSub)}</select></td><td class="p-2 border text-center"><button onclick="confirmEditLogic(${i})" class="text-emerald-600 mr-2 font-bold">OK</button><button onclick="cancelEditLogic()">X</button></td></tr>`;
+                return `<tr class="border-b text-[11px] hover:bg-slate-50"><td class="p-3 border text-slate-500">${l.group}</td><td class="p-3 border font-bold text-indigo-600">${l.code}</td><td class="p-3 border">${l.person === 'ALL' ? '全體' : l.person}</td><td class="p-3 border">${l.time}</td><td class="p-3 border font-bold">${l.posMain || '-'}</td><td class="p-3 border text-slate-400">${l.posSub || '-'}</td><td class="p-3 border text-center"><button onclick="startEditLogic(${i})" class="text-indigo-400 mr-2">編輯</button><button onclick="removeLogic(${i})" class="text-rose-300">刪除</button></td></tr>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        // --- 互動功能 ---
+        function toggleAdmin() { 
+            if(isAdmin){ 
+                isAdmin=false; 
+                document.body.classList.remove('is-admin'); 
+                document.getElementById('adminIcon').setAttribute('data-lucide','lock'); 
+                renderMonthlyTable(); 
+                lucide.createIcons();
+            } else { 
+                document.getElementById('loginModal').classList.remove('hidden'); 
+                document.getElementById('adminPassword').focus(); 
+            } 
+        }
+        function verifyPassword() { 
+            if(document.getElementById('adminPassword').value==="1234"){ 
+                isAdmin=true; 
+                document.body.classList.add('is-admin'); 
+                document.getElementById('adminIcon').setAttribute('data-lucide','unlock'); 
+                closeLogin(); 
+                renderMonthlyTable(); 
+                lucide.createIcons();
+            } else alert("錯誤");
+        }
+        function closeLogin(){ document.getElementById('loginModal').classList.add('hidden'); document.getElementById('adminPassword').value=''; }
+        function openVacationModal() { const m = document.getElementById('vacationModal'); m.classList.remove('hidden'); const cx = (window.innerWidth - m.offsetWidth) / 2, cy = (window.innerHeight - m.offsetHeight) / 2; m.style.top = cy + "px"; m.style.left = cx + "px"; document.getElementById('vacationStart').value = getSafeDateStr(currentYear, currentMonth, 1); document.getElementById('vacationEnd').value = getSafeDateStr(currentYear, currentMonth, 7); }
+        function closeVacationModal() { document.getElementById('vacationModal').classList.add('hidden'); }
         function openHolidayModal(d){ holidayEditContext=d; document.getElementById('holidayModalDate').innerText=d; document.getElementById('holidayInput').value=holidayRemarks[d]||""; document.getElementById('holidayModal').classList.remove('hidden'); }
         function closeHolidayModal(){ document.getElementById('holidayModal').classList.add('hidden'); }
-        function saveHolidayRemark(){ holidayRemarks[holidayEditContext]=document.getElementById('holidayInput').value.trim(); closeHolidayModal(); renderMonthlyTable(); }
-        function updateRequiredStaff(v){ requiredStaffCount=parseInt(v)||0; renderMonthlyTable(); }
-        function updateMemberName(gi,mi,v){ saveHistory(); const old=staffGroups[gi].members[mi]; staffGroups[gi].members[mi]=v; Object.keys(schedule).forEach(d=>{if(schedule[d][old]){schedule[d][v]=schedule[d][old]; delete schedule[d][old];}}); renderMonthlyTable();}
-        function addMember(gi){ saveHistory(); staffGroups[gi].members.push("新人員"); renderMonthlyTable();}
-        function removeMember(gi,mi){ saveHistory(); staffGroups[gi].members.splice(mi,1); renderMonthlyTable();}
-        
+        function closeWeeklyConfirm() { document.getElementById('weeklyConfirmView').classList.add('hidden'); }
+        function applyTool(ds, n, d) { if(!isAdmin && !["休","特","補","CLEAR"].includes(selectedTool)) return; if(!schedule[ds]) schedule[ds] = {}; if(selectedTool === "CLEAR") delete schedule[ds][n]; else schedule[ds][n] = selectedTool; triggerAutoSave(); renderMonthlyTable(); }
+        function updateMemberName(gi, mi, v) { const old = staffGroups[gi].members[mi]; staffGroups[gi].members[mi] = v; Object.keys(schedule).forEach(d => { if(schedule[d][old]){ schedule[d][v]=schedule[d][old]; delete schedule[d][old]; }}); triggerAutoSave(); renderMonthlyTable(); }
+        function addMember(gi) { staffGroups[gi].members.push("新人員"); triggerAutoSave(); renderMonthlyTable(); }
+        function removeMember(gi, mi) { staffGroups[gi].members.splice(mi, 1); triggerAutoSave(); renderMonthlyTable(); }
+        function updateRequiredStaff(v) { requiredStaffCount = parseInt(v)||0; triggerAutoSave(); renderMonthlyTable(); }
+        function saveHolidayRemark() { holidayRemarks[holidayEditContext] = document.getElementById('holidayInput').value.trim(); triggerAutoSave(); closeHolidayModal(); renderMonthlyTable(); }
+
+        // --- 週報表產出 ---
+        function prepareWeeklyReport() {
+            const sStr = document.getElementById('vacationStart').value; if(!sStr) return alert("請選日期");
+            const content = document.getElementById('weeklyConfirmContent'); content.innerHTML = ''; const sd = new Date(sStr);
+            for(let i=0; i<6; i++) {
+                let d = new Date(sd); d.setDate(d.getDate() + i); let ds = getSafeDateStr(d.getFullYear(), d.getMonth(), d.getDate()), dd = schedule[ds] || {};
+                let mC=0, cC=0, eC=0, rows = "";
+                staffGroups.forEach(g => g.members.forEach(m => {
+                    const c = dd[m]; if (!c || ["休","特","補","離職"].includes(c)) return;
+                    let l = shiftLogic.find(x => x.code === c && x.person === m) || shiftLogic.find(x => x.code === c && x.person === 'ALL');
+                    if (l) {
+                        if(l.group === "早班") mC++; else if(l.group === "夜班") eC++; else cC++;
+                        rows += `<tr><td contenteditable="true">${l.time}</td><td contenteditable="true" class="font-bold">${m.slice(-1)}</td><td contenteditable="true">${l.posMain + (l.posSub ? `(${l.posSub})` : '')}</td><td class="font-bold" contenteditable="true">${l.group === "早班" ? mC : ''}</td><td class="font-bold" contenteditable="true">${["中班","晚班"].includes(l.group) ? cC : ''}</td><td class="font-bold" contenteditable="true">${l.group === "夜班" ? eC : ''}</td></tr>`;
+                    }
+                }));
+                let cr = (rows.match(/<tr/g) || []).length; for(let r=0; r < (11-cr); r++) rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
+                const off = Object.keys(dd).filter(n => ["休","特","補"].includes(dd[n])).map(n => n.slice(-1)).join('、');
+                content.innerHTML += `<div class="day-card-container" data-date="${ds}"><div class="report-day-title" contenteditable="true">${d.getMonth()+1}/${d.getDate()} (週${["日","一","二","三","四","五","六"][d.getDay()]})</div><table class="report-table-final"><tr class="report-header"><td>班別</td><td>人員</td><td>崗位</td><td>早</td><td>中</td><td>晚</td></tr>${rows}</table><div class="mt-2 text-[10px] flex justify-between px-1"><span class="font-bold">休假人員：<span contenteditable="true" class="underline">${off || '無'}</span></span><span>發券：_______</span></div></div>`;
+            }
+            document.getElementById('weeklyConfirmView').classList.remove('hidden'); lucide.createIcons();
+        }
+
+        async function saveWeeklyToDatabase() { const data = Array.from(document.querySelectorAll('.day-card-container')).map(c => ({ date: c.getAttribute('data-date'), html: c.innerHTML })); try { await window.fbSetDoc(window.fbDoc(window.db, `artifacts/${window.appId}/public/data/reports`, `week_${data[0].date}`), { createdAt: new Date().toISOString(), data }); alert("存檔成功"); } catch(e) { alert("失敗"); }}
+
+        function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
+        function changeMonth(o) { currentMonth+=o; if(currentMonth>11){currentMonth=0;currentYear++;} else if(currentMonth<0){currentMonth=11;currentYear--;} renderMonthlyTable(); }
+        function getOptions(list, sel) { return list.map(v => `<option value="${v}" ${v === sel ? 'selected' : ''}>${v}</option>`).join(''); }
+        function getStaffOptions(sel) { let o = `<option value="ALL" ${sel === 'ALL' ? 'selected' : ''}>-- 全體 --</option>`; staffGroups.forEach(g => g.members.forEach(m => o += `<option value="${m}" ${sel === m ? 'selected' : ''}>${m}</option>`)); return o; }
+        function makeDraggable(el,h){let x=0,y=0,mx=0,my=0;h.onmousedown=(e)=>{e.preventDefault();mx=e.clientX;my=e.clientY;document.onmouseup=()=>{document.onmouseup=null;document.onmousemove=null;};document.onmousemove=(e)=>{e.preventDefault();x=mx-e.clientX;y=my-e.clientY;mx=e.clientX;my=e.clientY;el.style.top=(el.offsetTop-y)+"px";el.style.left=(el.offsetLeft-x)+"px";};};}
+        async function saveLogicToCloud() { try { await window.fbSetDoc(window.fbDoc(window.db, `artifacts/${window.appId}/public/data/logic`, 'current'), { data: shiftLogic }); alert("保存成功"); } catch(e) { alert("失敗"); }}
+        function generateVacationList() {
+            const s=document.getElementById('vacationStart').value, e=document.getElementById('vacationEnd').value; if(!s||!e) return;
+            let html="", sd=new Date(s), ed=new Date(e);
+            for(let d=new Date(sd); d<=ed; d.setDate(d.getDate()+1)) {
+                let ds=getSafeDateStr(d.getFullYear(), d.getMonth(), d.getDate()), dd=schedule[ds]||{};
+                const l1=Object.keys(dd).filter(n=>dd[n]==="休"), l2=Object.keys(dd).filter(n=>dd[n]==="特"), l3=Object.keys(dd).filter(n=>dd[n]==="補");
+                if(l1.length||l2.length||l3.length) html+=`<div class="p-2 bg-white border rounded shadow-sm text-[10px]"><b class="text-indigo-600">${ds}</b><div class="mt-1">${l1.length?`<span class="bg-rose-50 px-1 font-bold">休: ${l1.join(',')}</span>`:''} ${l2.length?`<span class="bg-amber-50 px-1 font-bold">特: ${l2.join(',')}</span>`:''} ${l3.length?`<span class="bg-blue-50 px-1 font-bold">補: ${l3.join(',')}</span>`:''}</div></div>`;
+            }
+            document.getElementById('vacationListContent').innerHTML=html||'無假紀錄';
+        }
+        function startEditLogic(i) { editLogicIndex = i; renderLogicList(); }
+        function cancelEditLogic() { editLogicIndex = -1; renderLogicList(); }
+        function confirmEditLogic(i) { shiftLogic[i] = { group: document.getElementById('editGroup').value, code: document.getElementById('editCode').value.trim(), person: document.getElementById('editStaff').value, time: document.getElementById('editTime').value, posMain: document.getElementById('editPosMain').value, posSub: document.getElementById('editPosSub').value }; editLogicIndex = -1; renderLogicList(); }
+
         window.onload = init;
     </script>
 </body>
 </html>
+
