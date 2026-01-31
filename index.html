@@ -113,7 +113,7 @@
         .col-report-time { width: 100px !important; } 
         .col-report-name { width: 65px !important; }  
         .col-report-pos { width: 80px !important; } 
-        .col-report-check { width: 20px !important; } 
+        .col-report-check { width: 20px !important; color: #ef4444 !important; font-weight: 900 !important; } /* 早中晚人數改紅色 */
 
         .report-select {
             width: 100%; height: 100%; border: none; background: transparent;
@@ -150,11 +150,11 @@
             .weekly-confirm-grid { grid-template-columns: 1fr; }
         }
 
-        /* 列印模式修正：隱藏所有遮蓋層與按鈕 */
+        /* 列印模式修正：強制隱藏所有遮蓋層 */
         @media print {
             .no-print, .modal-overlay { display: none !important; }
-            body { background: white !important; padding: 0; }
-            #weeklyConfirmView { position: static !important; height: auto !important; overflow: visible !important; background: white !important; display: block !important; }
+            body { background: white !important; padding: 0 !important; }
+            #weeklyConfirmView { position: static !important; height: auto !important; overflow: visible !important; background: white !important; display: block !important; z-index: auto !important; }
             .weekly-confirm-grid { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; padding: 0 !important; }
             .day-card-container { break-inside: avoid !important; border-width: 1.5px !important; box-shadow: none !important; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -224,7 +224,7 @@
             </div>
             <div class="flex gap-5 items-center font-mono font-bold text-slate-500">
                 <span>© 原點數位科技 2026</span>
-                <span id="versionLabel">v26.1.31.175</span>
+                <span id="versionLabel">v26.1.31.180</span>
                 <span id="modifyTime">載入中...</span>
             </div>
         </footer>
@@ -464,7 +464,7 @@
                         <td class="p-2 border"><select id="editLogicPriority" class="w-full text-[10px] border rounded p-1 font-bold">${[1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${parseInt(l.priority)===n?'selected':''}>${n}</option>`).join('')}</select></td>
                         <td class="p-2 border text-center"><button onclick="window.confirmEditLogic(${i})" class="bg-emerald-500 text-white px-4 py-1 rounded-lg font-bold focus:outline-none">確認</button></td></tr>`;
                 }
-                return `<tr class="border-b text-[10px] hover:bg-slate-50 font-bold"><td class="p-4 border font-black text-indigo-700">${l.person}</td><td class="p-4 border">${l.time}</td><td class="p-4 border font-black text-slate-800">${l.posMain || '-'}</td><td class="p-4 border text-slate-400">${l.posSub || '-'}</td><td class="p-4 border text-center">${l.priority || 5}</td><td class="p-4 border text-center space-x-3"><button onclick="window.startEditLogic(${i})" class="text-indigo-600 hover:underline">編輯</button><button onclick="window.removeLogic(${i})" class="text-rose-400 hover:underline">刪除</button></td></tr>`;
+                return `<tr class="border-b text-[10px] hover:bg-slate-50 font-bold"><td class="p-4 border font-black text-indigo-700">${l.person}</td><td class="p-4 border">${l.time}</td><td class="p-4 border font-black text-slate-800">${l.posMain || '-'}</td><td class="p-4 border text-slate-400">${l.posSub || '-'}</td><td class="p-4 border text-center">${l.priority || 5}</td><td class="p-4 border text-center space-x-3"><button onclick="window.startEditLogic(${i})" class="text-indigo-600 hover:underline transition focus:outline-none">編輯</button><button onclick="window.removeLogic(${i})" class="text-rose-400 hover:underline transition focus:outline-none">刪除</button></td></tr>`;
             }).join('');
             lucide.createIcons();
         };
@@ -473,7 +473,7 @@
         window.confirmEditLogic = (i) => { const updated = { person: document.getElementById('editLogicStaff').value, time: document.getElementById('editLogicTime').value, posMain: document.getElementById('editLogicPosMain').value, posSub: document.getElementById('editLogicPosSub').value, priority: parseInt(document.getElementById('editLogicPriority').value) || 5 }; window.collectNewPositions(updated); shiftLogic[i] = updated; editLogicIndex = -1; window.renderDatalist(); window.renderLogicList(); };
         window.addLogicRow = () => { const newItem = { person: document.getElementById('logicStaff').value, time: document.getElementById('logicTime').value, posMain: document.getElementById('logicPosMain').value, posSub: document.getElementById('logicPosSub').value, priority: parseInt(document.getElementById('logicPriority').value) || 5 }; window.collectNewPositions(newItem); shiftLogic.push(newItem); window.renderDatalist(); window.renderLogicList(); };
         window.removeLogic = (i) => { if(confirm("確定刪除？")) { shiftLogic.splice(i, 1); window.renderLogicList(); } };
-        window.saveLogicToCloud = async () => { try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'logic', 'current'), { data: shiftLogic, positions: knownPositions }); alert("上傳完成"); } catch(e) { } };
+        window.saveLogicToCloud = async () => { try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'logic', 'current'), { data: shiftLogic, positions: knownPositions }); alert("儲存完成"); } catch(e) { } };
 
         // --- 工具標籤管理 ---
         window.openToolManager = () => { window.renderToolList(); document.getElementById('toolManagerModal').classList.remove('hidden'); lucide.createIcons(); };
@@ -486,7 +486,7 @@
         window.removeTool = (i) => { shiftTypes.splice(i, 1); window.renderToolList(); window.renderToolbar(); };
         window.saveToolsToCloud = async () => { try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'toolbar_settings', 'current'), { data: shiftTypes }); alert("同步完成"); window.closeToolManager(); } catch(e) { } };
 
-        // --- 週報表產出 (核心修正: 早中晚人數標示) ---
+        // --- 週報表產出 (修正早中晚人數標示) ---
         window.prepareWeeklyReport = () => {
             const sStr = document.getElementById('vacationStart').value; const eStr = document.getElementById('vacationEnd').value;
             if(!sStr || !eStr) return alert("請先選擇區間");
