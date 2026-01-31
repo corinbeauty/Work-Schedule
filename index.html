@@ -112,7 +112,7 @@
         /* 報表特定欄位寬度控制 */
         .col-report-time { width: 100px !important; } 
         .col-report-name { width: 65px !important; }  
-        .col-report-pos { width: 80px !important; } /* 崗位限縮 8 字元空間 */
+        .col-report-pos { width: 80px !important; } 
         .col-report-check { width: 20px !important; } 
 
         .report-select {
@@ -224,7 +224,7 @@
             </div>
             <div class="flex gap-5 items-center font-mono font-bold text-slate-500">
                 <span>© 原點數位科技 2026</span>
-                <span id="versionLabel">v26.1.31.170</span>
+                <span id="versionLabel">v26.1.31.175</span>
                 <span id="modifyTime">載入中...</span>
             </div>
         </footer>
@@ -448,7 +448,7 @@
                 <div><label class="text-[8px] font-black text-slate-400 block mb-1 text-left">時段</label><select id="logicTime" class="w-full border-2 border-slate-200 rounded-xl p-2 text-sm bg-white font-bold focus:outline-none">${timeOptionsHtml}</select></div>
                 <div><label class="text-[8px] font-black text-slate-400 block mb-1 text-left">主崗</label><input id="logicPosMain" list="positionOptions" class="w-full border-2 border-slate-200 rounded-xl p-2 text-sm bg-white font-bold focus:outline-none" placeholder="輸入"></div>
                 <div><label class="text-[8px] font-black text-slate-400 block mb-1 text-left">副崗</label><input id="logicPosSub" list="positionOptions" class="w-full border-2 border-slate-200 rounded-xl p-2 text-sm bg-white font-bold focus:outline-none" placeholder="輸入"></div>
-                <div><label class="text-[8px] font-black text-slate-400 block mb-1 text-left">優先</label><select id="logicPriority" class="w-full border-2 border-slate-200 rounded-xl p-2 text-sm bg-white font-bold focus:outline-none">${[1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${n===5?'selected':''}>${n}</option>`).join('')}</select></div>`;
+                <div><label class="text-[8px] font-black text-slate-400 block mb-1 text-left">優先權</label><select id="logicPriority" class="w-full border-2 border-slate-200 rounded-xl p-2 text-sm bg-white font-bold focus:outline-none">${[1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}" ${n===5?'selected':''}>${n}</option>`).join('')}</select></div>`;
         };
         window.renderLogicList = () => {
             const body = document.getElementById('logicListBody');
@@ -473,7 +473,7 @@
         window.confirmEditLogic = (i) => { const updated = { person: document.getElementById('editLogicStaff').value, time: document.getElementById('editLogicTime').value, posMain: document.getElementById('editLogicPosMain').value, posSub: document.getElementById('editLogicPosSub').value, priority: parseInt(document.getElementById('editLogicPriority').value) || 5 }; window.collectNewPositions(updated); shiftLogic[i] = updated; editLogicIndex = -1; window.renderDatalist(); window.renderLogicList(); };
         window.addLogicRow = () => { const newItem = { person: document.getElementById('logicStaff').value, time: document.getElementById('logicTime').value, posMain: document.getElementById('logicPosMain').value, posSub: document.getElementById('logicPosSub').value, priority: parseInt(document.getElementById('logicPriority').value) || 5 }; window.collectNewPositions(newItem); shiftLogic.push(newItem); window.renderDatalist(); window.renderLogicList(); };
         window.removeLogic = (i) => { if(confirm("確定刪除？")) { shiftLogic.splice(i, 1); window.renderLogicList(); } };
-        window.saveLogicToCloud = async () => { try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'logic', 'current'), { data: shiftLogic, positions: knownPositions }); alert("儲存完成"); } catch(e) { } };
+        window.saveLogicToCloud = async () => { try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'logic', 'current'), { data: shiftLogic, positions: knownPositions }); alert("上傳完成"); } catch(e) { } };
 
         // --- 工具標籤管理 ---
         window.openToolManager = () => { window.renderToolList(); document.getElementById('toolManagerModal').classList.remove('hidden'); lucide.createIcons(); };
@@ -486,15 +486,14 @@
         window.removeTool = (i) => { shiftTypes.splice(i, 1); window.renderToolList(); window.renderToolbar(); };
         window.saveToolsToCloud = async () => { try { await window.fbSetDoc(window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', 'toolbar_settings', 'current'), { data: shiftTypes }); alert("同步完成"); window.closeToolManager(); } catch(e) { } };
 
-        // --- 週報表產出 (核心修正: 產出後先關閉彈窗) ---
+        // --- 週報表產出 (核心修正: 早中晚人數標示) ---
         window.prepareWeeklyReport = () => {
             const sStr = document.getElementById('vacationStart').value; const eStr = document.getElementById('vacationEnd').value;
             if(!sStr || !eStr) return alert("請先選擇區間");
             const sd = new Date(sStr); const ed = new Date(eStr);
             const diffDays = Math.ceil((ed - sd) / (1000 * 60 * 60 * 24)) + 1;
             
-            // 修正: 關閉管理者彈窗以避免遮擋 PDF 畫面
-            window.closeVacationModal();
+            window.closeVacationModal(); // 修正PDF擋住問題
 
             const content = document.getElementById('weeklyConfirmContent'); content.innerHTML = ''; 
             const flatStaffOrder = staffGroups.flatMap(g => g.members);
@@ -505,9 +504,7 @@
                 let d = new Date(sd); d.setDate(d.getDate() + i); 
                 let ds = getSafeDateStr(d.getFullYear(), d.getMonth(), d.getDate());
                 let dd = schedule[ds] || {}; let activeWorkers = [];
-                const wObj = getWeather(d);
-                const holiday = PUBLIC_HOLIDAYS[ds] || "";
-                const remark = holidayRemarks[ds] || "";
+                const wObj = getWeather(d); const holiday = PUBLIC_HOLIDAYS[ds] || ""; const remark = holidayRemarks[ds] || "";
                 const combinedRemark = [holiday, remark].filter(x => x).join(' ');
 
                 staffGroups.forEach(g => g.members.forEach(m => {
@@ -517,44 +514,35 @@
                     else { activeWorkers.push({ name: m, logic: { time: "08:00 - 16:30", posMain: "待補", posSub: "" } }); }
                 }));
 
+                let mCount = 0, aCount = 0, eCount = 0;
                 let rowsHtml = "";
                 activeWorkers.forEach(w => { 
+                    const startTime = w.logic.time.split(' - ')[0];
+                    let morningVal = "", afternoonVal = "", eveningVal = "";
+                    
+                    // 早: 08:00 ~ 15:30 | 中: 15:30 ~ 21:00 | 晚: 17:30 ~ 23:50
+                    if (startTime >= "08:00" && startTime <= "15:30") { mCount++; morningVal = mCount; }
+                    if (startTime >= "15:30" && startTime <= "21:00") { aCount++; afternoonVal = aCount; }
+                    if (startTime >= "17:30" && startTime <= "23:50") { eCount++; eveningVal = eCount; }
+
                     rowsHtml += `<tr>
                         <td class="col-report-time"><select class="report-select">${TIME_SLOTS.map(t => `<option value="${t}" ${w.logic.time === t ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
                         <td class="col-report-name"><select class="report-select report-name-select">${flatStaffOrder.map(n => `<option value="${n}" ${w.name === n ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
                         <td class="col-report-pos" contenteditable="true">${w.logic.posMain + (w.logic.posSub ? `(${w.logic.posSub})` : '')}</td>
-                        <td class="col-report-check" contenteditable="true"></td><td class="col-report-check" contenteditable="true"></td><td class="col-report-check" contenteditable="true"></td>
+                        <td class="col-report-check" contenteditable="true">${morningVal}</td>
+                        <td class="col-report-check" contenteditable="true">${afternoonVal}</td>
+                        <td class="col-report-check" contenteditable="true">${eveningVal}</td>
                     </tr>`; 
                 });
                 for(let r = 0; r < (11 - activeWorkers.length); r++) {
-                    rowsHtml += `<tr>
-                        <td class="col-report-time"><select class="report-select"><option value="">--</option>${TIME_SLOTS.map(t=>`<option value="${t}">${t}</option>`).join('')}</select></td>
-                        <td class="col-report-name"><select class="report-select report-name-select"><option value="">--</option>${flatStaffOrder.map(n=>`<option value="${n}">${n}</option>`).join('')}</select></td>
-                        <td class="col-report-pos" contenteditable="true"></td>
-                        <td class="col-report-check" contenteditable="true"></td><td class="col-report-check" contenteditable="true"></td><td class="col-report-check" contenteditable="true"></td>
-                    </tr>`;
+                    rowsHtml += `<tr><td class="col-report-time"><select class="report-select"><option value="">--</option>${timeOptionsHtml}</select></td><td class="col-report-name"><select class="report-select report-name-select"><option value="">--</option>${nameOptionsHtml}</select></td><td class="col-report-pos" contenteditable="true"></td><td class="col-report-check" contenteditable="true"></td><td class="col-report-check" contenteditable="true"></td><td class="col-report-check" contenteditable="true"></td></tr>`;
                 }
                 
                 const offNames = Object.keys(dd).filter(n => ["休", "特", "補"].includes(dd[n]))
                     .sort((a, b) => flatStaffOrder.indexOf(a) - flatStaffOrder.indexOf(b))
                     .map(n => staffAliases[n] || n).join('、');
 
-                content.innerHTML += `
-                    <div class="day-card-container">
-                        <div class="report-day-title flex flex-wrap items-center justify-center gap-1">
-                            <span>${d.getMonth() + 1}/${d.getDate()} (週${["日", "一", "二", "三", "四", "五", "六"][d.getDay()]})</span>
-                            <span class="${wObj.c} text-[9px] font-black">${wObj.l}</span>
-                            ${combinedRemark ? `<span class="text-rose-600 text-[9px] font-black">[${combinedRemark}]</span>` : ''}
-                        </div>
-                        <table class="report-table-final">
-                            <thead><tr class="report-header-bg"><td class="col-report-time">時間</td><td class="col-report-name">人</td><td class="col-report-pos">崗位</td><td class="col-report-check">早</td><td class="col-report-check">中</td><td class="col-report-check">晚</td></tr></thead>
-                            <tbody>${rowsHtml}</tbody>
-                        </table>
-                        <div class="mt-2 text-[11px] flex justify-between px-1 font-bold items-center">
-                            <span>休：<span class="text-rose-500">${offNames || '無'}</span></span>
-                            <span class="opacity-80">發券：<span contenteditable="true" class="voucher-input"></span></span>
-                        </div>
-                    </div>`;
+                content.innerHTML += `<div class="day-card-container"><div class="report-day-title flex flex-wrap items-center justify-center gap-1"><span>${d.getMonth() + 1}/${d.getDate()} (週${["日", "一", "二", "三", "四", "五", "六"][d.getDay()]})</span><span class="${wObj.c} text-[9px] font-black">${wObj.l}</span>${combinedRemark ? `<span class="text-rose-600 text-[9px] font-black">[${combinedRemark}]</span>` : ''}</div><table class="report-table-final"><thead><tr class="report-header-bg"><td class="col-report-time">時間</td><td class="col-report-name">人</td><td class="col-report-pos">崗位</td><td class="col-report-check">早</td><td class="col-report-check">中</td><td class="col-report-check">晚</td></tr></thead><tbody>${rowsHtml}</tbody></table><div class="mt-2 text-[11px] flex justify-between px-1 font-bold items-center"><span>休：<span class="text-rose-500">${offNames || '無'}</span></span><span class="opacity-80">發券：<span contenteditable="true" class="voucher-input"></span></span></div></div>`;
             }
             document.getElementById('weeklyConfirmView').classList.remove('hidden'); lucide.createIcons();
         };
