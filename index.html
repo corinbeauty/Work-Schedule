@@ -2,152 +2,635 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>系統維護中 | 排班管理系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>手舞足道 - 中清行館排班系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 系統金鑰
+        const PASS_MASTER = "1016"; 
+        const firebaseConfig = {
+            apiKey: "AIzaSyAdjCBcgRvDyv3ApKBGfhDSRrjcDv23Mrw",
+            authDomain: "wrok-schedule.firebaseapp.com",
+            projectId: "wrok-schedule",
+            storageBucket: "wrok-schedule.firebasestorage.app",
+            messagingSenderId: "640239028584",
+            appId: "1:640239028584:web:adbfd3000029139cd5eedd"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const PATH_APP = "shou-wu-zu-dao-main";
+
+        // 全域對象
+        window.db = db; window.auth = auth; window.appId = PATH_APP; window.PASS_MASTER = PASS_MASTER;
+        window.fbDoc = doc; window.fbSetDoc = setDoc; window.fbGetDoc = getDoc; window.onSnapshot = onSnapshot;
+
+        window.currentYear = 2026; window.currentMonth = 1; 
+        window.currentStore = "中清行館";
+        window.isAdmin = false; window.schedule = {}; window.staffGroups = []; window.lockedMonths = {}; 
+        window.selectedTool = "休"; window.requiredStaff = 14;
+        window.showOnlyOff = false; window.customTags = []; window.staffAliases = {};
+        window.currentSelectedColor = "#1e293b";
+        
+        // 歷史紀錄狀態機
+        window.undoStack = [];
+        window.redoStack = [];
+
+        window.HOLIDAY_DB = { 
+            "2026-01-01": { n: "元旦", r: true }, "2026-01-05": { n: "十六", r: false }, "2026-01-19": { n: "初二", r: false }, 
+            "2026-02-03": { n: "十六", r: false }, "2026-02-14": { n: "春節", r: true }, "2026-02-15": { n: "春節", r: true }, 
+            "2026-02-16": { n: "除夕", r: true }, "2026-02-17": { n: "初一", r: true }, "2026-02-18": { n: "初二", r: true }, 
+            "2026-02-19": { n: "初三", r: true }, "2026-02-20": { n: "初四", r: true }, "2026-02-21": { n: "初五", r: true }, 
+            "2026-02-22": { n: "春節", r: true }, "2026-02-27": { n: "228連假", r: true }, "2026-02-28": { n: "228連假", r: true }, 
+            "2026-03-01": { n: "228連假", r: true }, "2026-03-04": { n: "十六", r: false }, "2026-03-19": { n: "初二", r: false },
+            "2026-04-03": { n: "清明兒童", r: true }, "2026-04-04": { n: "清明兒童", r: true }, "2026-04-05": { n: "清明兒童", r: true }, 
+            "2026-04-06": { n: "清明兒童", r: true }, "2026-04-18": { n: "初二", r: false },
+            "2026-05-01": { n: "勞動節", r: true }, "2026-05-02": { n: "勞動節", r: true }, "2026-05-03": { n: "勞動節", r: true },
+            "2026-06-19": { n: "端午節", r: true }, "2026-06-20": { n: "端午節", r: true }, "2026-06-21": { n: "端午節", r: true },
+            "2026-09-25": { n: "中秋連假", r: true }, "2026-09-26": { n: "中秋連假", r: true }, "2026-09-27": { n: "中秋連假", r: true }, "2026-09-28": { n: "教師節", r: true },
+            "2026-10-09": { n: "國慶連假", r: true }, "2026-10-10": { n: "國慶連假", r: true }, "2026-10-11": { n: "國慶連假", r: true },
+            "2026-10-24": { n: "光復連假", r: true }, "2026-10-25": { n: "光復連假", r: true }, "2026-10-26": { n: "光復連假", r: true },
+            "2026-12-25": { n: "行憲連假", r: true }, "2026-12-26": { n: "行憲連假", r: true }, "2026-12-27": { n: "行憲連假", r: true }
+        };
+
+        const initAuth = async () => {
+            onAuthStateChanged(auth, (user) => {
+                if (user) window.enterApp();
+                else signInAnonymously(auth);
+            });
+            setTimeout(() => { if(document.getElementById('landingPage').style.display !== 'none') window.enterApp(); }, 3000);
+        };
+        initAuth();
+    </script>
+
     <style>
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-            color: #f8fafc;
-            overflow: hidden;
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        
+        :root {
+            --col-name: 80px;
+            --col-shift: 40px;
+            --col-day: 32px;
         }
 
-        /* 齒輪旋轉動畫 */
-        @keyframes gear-rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        * { box-sizing: border-box; }
+
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; color: #0f172a; font-size: 0.65rem; }
+        
+        .group-row-早 { background-color: #fffdf5 !important; }
+        .group-row-中, .group-row-晚 { background-color: #f7fff9 !important; }
+        .group-row-夜 { background-color: #fdfaff !important; }
+
+        td.frame-b-name, td.frame-a-shift { background-color: inherit !important; }
+
+        .time-tag { border-radius: 4px; padding: 1px 2px; display: inline-block; font-weight: 800; font-size: 0.55rem; }
+        .time-area-green { background-color: #dcfce7 !important; color: #166534 !important; }
+        .time-area-yellow { background-color: #fef9c3 !important; color: #854d0e !important; }
+        .time-area-blue { background-color: #dbeafe !important; color: #1e40af !important; }
+
+        .is-holiday-bg { background-color: #fff1f2 !important; }
+        .is-holiday-text { color: #f43f5e !important; font-weight: 900; }
+        .cell-off { background-color: #fb7185 !important; color: #ffffff !important; font-weight: 900; }
+        .cell-custom { color: #ffffff !important; font-weight: 900; }
+
+        .table-wrapper { background: white; border-radius: 10px; box-shadow: 0 1px 15px rgba(0,0,0,0.04); overflow: auto; border: 1px solid #eef2f6; position: relative; }
+        table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
+        
+        th, td { 
+            border: 1px solid #f1f5f9; 
+            text-align: center !important; 
+            vertical-align: middle !important;
+            height: 32px; 
+            position: relative; 
+            transition: all 0.1s; 
+            padding: 0 !important; 
         }
 
-        @keyframes gear-rotate-reverse {
-            from { transform: rotate(360deg); }
-            to { transform: rotate(0deg); }
-        }
+        .frame-b-name { position: sticky; left: 0; z-index: 50; border-right: 1px solid #e2e8f0; width: var(--col-name) !important; min-width: var(--col-name) !important; }
+        .frame-a-shift { position: sticky; left: var(--col-name); z-index: 49; border-right: 2px solid #e2e8f0; width: var(--col-shift) !important; min-width: var(--col-shift) !important; font-weight: 900; }
 
-        /* 呼吸燈效果 */
-        @keyframes pulse-custom {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(0.98); }
-        }
+        thead .frame-b-name, thead .frame-a-shift { background: #f1f5f9 !important; color: #94a3b8; }
+        tr:hover td.frame-b-name, tr:hover td.frame-a-shift { background-color: #eff6ff !important; color: #2563eb !important; }
 
-        .gear-container {
-            position: relative;
-            width: 120px;
-            height: 120px;
-            margin-bottom: 2rem;
-        }
+        #mainTable { overflow: hidden; }
+        td:hover::after { content: ""; position: absolute; left: 0; top: -5000px; height: 10000px; width: 100%; background-color: rgba(99, 102, 241, 0.04); pointer-events: none; z-index: 10; border-left: 1px dashed rgba(99, 102, 241, 0.1); border-right: 1px dashed rgba(99, 102, 241, 0.1); }
 
-        .gear-main {
-            animation: gear-rotate 8s linear infinite;
-            fill: #38bdf8;
-        }
+        @keyframes breath-ring { 0%, 100% { box-shadow: 0 0 0 0px rgba(239, 68, 68, 0); border-color: #e2e8f0; } 50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.4); border-color: #ef4444; } }
+        .animate-lock-breath-ring { animation: breath-ring 2s infinite; border-width: 2px !important; }
+        .locked-overlay { pointer-events: none; filter: grayscale(0.1); opacity: 0.95; }
 
-        .gear-small {
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 50px;
-            height: 50px;
-            animation: gear-rotate-reverse 4s linear infinite;
-            fill: #0ea5e9;
-        }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: white; width: 90%; max-width: 400px; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); overflow: hidden; }
+        .stepper-btn { padding: 2px; border-radius: 4px; background: #f1f5f9; transition: all 0.2s; color: #64748b; }
+        .stepper-btn:hover { background: #e2e8f0; color: #0f172a; transform: scale(1.1); }
+        .vertical-holiday { writing-mode: vertical-rl; text-orientation: upright; font-size: 8px; line-height: 1; height: 45px; display: flex; align-items: center; justify-content: center; width: 100%; font-weight: 900; margin: 0 auto; }
+        @keyframes blink-red { 0%, 100% { color: #f43f5e; opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-blink-red { animation: blink-red 1.5s infinite; }
+        
+        .dragging { opacity: 0.5; background-color: #eff6ff !important; }
+        .drag-handle { cursor: grab; opacity: 0.3; transition: opacity 0.2s; }
+        .drag-handle:hover { opacity: 1; }
 
-        .maintenance-card {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1.5rem;
-            padding: 3rem;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            max-width: 500px;
-            width: 90%;
-            text-align: center;
-            animation: pulse-custom 4s ease-in-out infinite;
-        }
+        #footerNotes { transition: all 0.2s; padding: 8px; border-radius: 8px; border: 1px dashed transparent; }
+        #footerNotes[contenteditable="true"] { cursor: text; }
+        #footerNotes[contenteditable="true"]:hover { background-color: #f1f5f9; border-color: #cbd5e1; }
+        #footerNotes[contenteditable="true"]:focus { background-color: #ffffff; border-color: #3b82f6; border-style: solid; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
 
-        .status-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            background-color: #fbbf24;
-            border-radius: 50%;
-            margin-right: 8px;
-            box-shadow: 0 0 10px #fbbf24;
-        }
+        /* [回復] 色彩選擇器樣式 */
+        .tag-color-picker { width: 26px; height: 26px; border-radius: 8px; cursor: pointer; border: 2px solid white; box-shadow: 0 0 0 1px #e2e8f0; transition: all 0.2s; }
+        .tag-color-picker.active { border-color: #0f172a; transform: scale(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .admin-btn { width: 100%; padding: 12px; margin-bottom: 6px; border-radius: 12px; display: flex; align-items: center; gap: 10px; font-weight: 700; background: #f8fafc; border: 1px solid #f1f5f9; transition: all 0.2s; text-align: left; font-size: 0.75rem; }
+        .admin-btn:hover { background: #f1f5f9; transform: translateY(-1px); }
 
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-            margin: 2rem 0;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            width: 80%;
-            height: 100%;
-            background: linear-gradient(90deg, #38bdf8, #818cf8);
-            border-radius: 3px;
+        /* [核心優化] 列印樣式 */
+        @media print {
+            .no-print { display: none !important; }
+            body { padding: 0; background: white; }
+            .table-wrapper { box-shadow: none; border: none; overflow: visible; }
+            table { width: 100% !important; table-layout: fixed; }
+            .frame-b-name, .frame-a-shift { position: static !important; }
+            th, td { border: 1px solid #000 !important; color: #000 !important; }
+            .cell-off { background-color: #f1f5f9 !important; color: #000 !important; border: 1px solid #000 !important; }
+            @page { margin: 0.5cm; size: landscape; }
         }
     </style>
 </head>
-<body>
+<body class="p-2 md:p-6 bg-slate-50">
 
-    <div class="maintenance-card">
-        <!-- 圖示區域 -->
-        <div class="flex justify-center">
-            <div class="gear-container">
-                <!-- 大齒輪 SVG -->
-                <svg class="gear-main" viewBox="0 0 100 100">
-                    <path d="M94.5,41.2l-8.9-1.5c-0.7-2.3-1.6-4.5-2.7-6.5l5.3-7.4c0.8-1.1,0.7-2.7-0.3-3.7l-5.7-5.7c-1-1-2.5-1.1-3.7-0.3l-7.4,5.3c-2-1.1-4.2-2-6.5-2.7l-1.5-8.9c-0.2-1.3-1.4-2.3-2.7-2.3h-8c-1.3,0-2.5,1-2.7,2.3l-1.5,8.9c-2.3,0.7-4.5,1.6-6.5,2.7l-7.4-5.3c-1.1-0.8-2.7-0.7-3.7,0.3l-5.7,5.7c-1,1-1.1,2.5-0.3,3.7l5.3,7.4c-1.1,2-2,4.2-2.7,6.5l-8.9,1.5C1,41.4,0,42.6,0,43.9v8c0,1.3,1,2.5,2.3,2.7l8.9,1.5c0.7,2.3,1.6,4.5,2.7,6.5l-5.3,7.4c-0.8,1.1-0.7,2.7,0.3,3.7l5.7,5.7c1,1,2.5,1.1,3.7,0.3l7.4,5.3c2,1.1,4.2,2,6.5,2.7l1.5,8.9c0.2,1.3,1.4,2.3,2.7,2.3h8c1.3,0,2.5-1,2.7-2.3l1.5-8.9c2.3-0.7,4.5-1.6,6.5-2.7l7.4,5.3c1.1,0.8,2.7,0.7,3.7-0.3l5.7-5.7c1-1,1.1-2.5,0.3-3.7l-5.3-7.4c1.1-2,2-4.2,2.7-6.5l8.9-1.5c1.3-0.2,2.3-1.4,2.3-2.7v-8C96.8,42.6,95.8,41.4,94.5,41.2z M48.4,65.5c-9.4,0-17.1-7.7-17.1-17.1s7.7-17.1,17.1-17.1s17.1,7.7,17.1,17.1S57.8,65.5,48.4,65.5z"/>
-                </svg>
-                <!-- 小齒輪 SVG -->
-                <svg class="gear-small" viewBox="0 0 100 100">
-                    <path d="M94.5,41.2l-8.9-1.5c-0.7-2.3-1.6-4.5-2.7-6.5l5.3-7.4c0.8-1.1,0.7-2.7-0.3-3.7l-5.7-5.7c-1-1-2.5-1.1-3.7-0.3l-7.4,5.3c-2-1.1-4.2-2-6.5-2.7l-1.5-8.9c-0.2-1.3-1.4-2.3-2.7-2.3h-8c-1.3,0-2.5,1-2.7,2.3l-1.5,8.9c-2.3,0.7-4.5,1.6-6.5,2.7l-7.4-5.3c-1.1-0.8-2.7-0.7-3.7,0.3l-5.7,5.7c-1,1-1.1,2.5-0.3,3.7l5.3,7.4c-1.1,2-2,4.2-2.7,6.5l-8.9,1.5C1,41.4,0,42.6,0,43.9v8c0,1.3,1,2.5,2.3,2.7l8.9,1.5c0.7,2.3,1.6,4.5,2.7,6.5l-5.3,7.4c-0.8,1.1-0.7,2.7,0.3,3.7l5.7,5.7c1,1,2.5,1.1,3.7,0.3l7.4,5.3c2,1.1,4.2,2,6.5,2.7l1.5,8.9c0.2,1.3,1.4,2.3,2.7,2.3h8c1.3,0,2.5-1,2.7-2.3l1.5-8.9c2.3-0.7,4.5-1.6,6.5-2.7l7.4,5.3c1.1,0.8,2.7,0.7,3.7-0.3l5.7-5.7c1-1,1.1-2.5,0.3-3.7l-5.3-7.4c1.1-2,2-4.2,2.7-6.5l8.9-1.5c1.3-0.2,2.3-1.4,2.3-2.7v-8C96.8,42.6,95.8,41.4,94.5,41.2z M48.4,65.5c-9.4,0-17.1-7.7-17.1-17.1s7.7-17.1,17.1-17.1s17.1,7.7,17.1,17.1S57.8,65.5,48.4,65.5z"/>
-                </svg>
+    <div id="landingPage" class="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center z-[9999]">
+        <div class="p-4 rounded-3xl bg-blue-600 animate-pulse mb-6"><i data-lucide="shield-check" class="text-white w-10 h-10"></i></div>
+        <h2 class="text-white text-lg font-black tracking-widest uppercase opacity-80">CONNECTED</h2>
+    </div>
+
+    <div id="app" class="hidden max-w-[2200px] mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 gap-4 no-print">
+            <div class="space-y-2">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-2xl font-black text-slate-800 tracking-tight">中清行館 <span class="text-blue-500 font-bold">排班系統</span></h1>
+                    <button id="lockStatusBtn" onclick="window.handleLockClick()" class="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-sm hover:bg-slate-50 transition border-2">
+                        <i data-lucide="unlock" id="lockIcon" class="w-3 h-3 text-emerald-500"></i>
+                        <span id="lockText" class="text-[9px] font-black text-slate-500 uppercase tracking-tighter">開放中</span>
+                    </button>
+                </div>
+                <div class="flex items-center bg-white p-1 rounded-xl shadow-sm border border-slate-200 w-fit">
+                    <button onclick="window.changeMonth(-1)" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                    <span id="monthDisplay" class="px-4 text-sm font-black text-slate-700 min-w-[110px] text-center font-mono"></span>
+                    <button onclick="window.changeMonth(1)" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                </div>
             </div>
-        </div>
 
-        <!-- 標題 -->
-        <h1 class="text-3xl font-bold mb-2 tracking-tight">系統維護更新中</h1>
-        <div class="flex items-center justify-center text-yellow-400 text-sm mb-6">
-            <span class="status-dot"></span>
-            <span>正在資安維護及資料庫效能升級中</span>
-        </div>
-
-        <!-- 說明文字 -->
-        <p class="text-slate-400 leading-relaxed mb-6">
-            為了保障系統安全並提升操作流暢度，我們正進行深度的資安檢查與資料庫優化。維護期間系統將暫停服務。
-        </p>
-
-        <!-- 進度條 -->
-        <div class="progress-bar">
-            <div class="progress-fill"></div>
-        </div>
-
-        <!-- 預計資訊 -->
-        <div class="grid grid-cols-2 gap-4">
-            <div class="bg-slate-800/50 p-3 rounded-lg border border-slate-700">
-                <div class="text-xs text-slate-500 uppercase mb-1">預計完成時間</div>
-                <div class="text-sm font-semibold">完成後開放</div>
+            <div class="flex items-center gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100">
+                <div class="flex gap-1 pr-2 border-r border-slate-100">
+                    <button id="undoBtn" onclick="window.undo()" class="p-2 rounded-lg hover:bg-slate-50 text-slate-400 disabled:opacity-20 transition-all" title="復原">
+                        <i data-lucide="undo-2" class="w-4 h-4"></i>
+                    </button>
+                    <button id="redoBtn" onclick="window.redo()" class="p-2 rounded-lg hover:bg-slate-50 text-slate-400 disabled:opacity-20 transition-all" title="重做">
+                        <i data-lucide="redo-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                
+                <div id="toolbar" class="flex gap-1 overflow-x-auto max-w-[450px] no-scrollbar"></div>
+                <div class="w-px h-6 bg-slate-100 mx-1"></div>
+                <button onclick="window.toggleView()" id="viewToggleBtn" class="p-2 rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50 flex items-center gap-2 px-3 transition-colors">
+                    <i data-lucide="eye-off" id="viewIcon" class="w-3.5 h-3.5"></i>
+                    <span class="text-[9px] font-black uppercase">精簡</span>
+                </button>
+                <button id="loginTrigger" onclick="window.handleLoginBtnClick()" class="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-xl font-bold text-[10px] hover:bg-slate-700 shadow-sm">
+                    <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+                    <span id="loginLabel">管理</span>
+                </button>
             </div>
-            <div class="bg-slate-800/50 p-3 rounded-lg border border-slate-700">
-                <div class="text-xs text-slate-500 uppercase mb-1">目前進度</div>
-                <div class="text-sm font-semibold text-sky-400">系統效能調優中</div>
+        </header>
+
+        <div id="tableContainer" class="table-wrapper">
+            <table id="mainTable">
+                <colgroup id="mainColgroup"></colgroup>
+                <thead id="tableHead" class="bg-slate-50"></thead>
+                <tbody id="tableBody"></tbody>
+                <tfoot id="tableFoot" class="bg-slate-50/50"></tfoot>
+            </table>
+        </div>
+
+        <div class="mt-4 flex flex-col md:flex-row gap-4 items-stretch no-print">
+            <div class="flex-1 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><i data-lucide="message-square" class="w-3 h-3"></i> Store Notes</p>
+                <div id="footerNotes" class="text-slate-600 font-bold leading-relaxed whitespace-pre-line outline-none text-xs" contenteditable="false" onblur="window.saveFooter()">讀取中...</div>
+            </div>
+            
+            <div id="adminStatusBar" class="md:w-56 bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center transition-all">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                        <div id="statusDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                        <span id="statusLabel" class="text-[9px] font-black text-slate-400 uppercase">Connected</span>
+                    </div>
+                    <span class="text-[8px] text-slate-300 font-bold uppercase tracking-widest">v4.8.PRINT</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span id="syncTime" class="text-[10px] font-bold text-slate-600 font-mono truncate">STANDBY</span>
+                    <button id="quickLogoutBtn" onclick="window.logout()" class="hidden bg-rose-50 text-rose-500 p-1 rounded-lg hover:bg-rose-100 shadow-sm ml-2">
+                        <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- 背景裝飾 -->
-    <div class="fixed -bottom-20 -left-20 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl"></div>
-    <div class="fixed -top-20 -right-20 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl"></div>
+    <div id="modalOverlay" class="modal-overlay hidden" onclick="window.closeModal()">
+        <div id="modalBox" class="modal-content" onclick="event.stopPropagation()"></div>
+    </div>
 
+    <script>
+        const PRESET_COLORS = ["#1e293b", "#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#64748b"];
+
+        window.getTimeAreaClass = (val) => {
+            if (val === "0800-1530") return "time-area-green";
+            if (val === "1630-1830") return "time-area-yellow";
+            if (val === "1930-2350") return "time-area-blue";
+            return "";
+        };
+
+        window.pushToUndo = () => {
+            window.undoStack.push(JSON.stringify(window.schedule));
+            if (window.undoStack.length > 50) window.undoStack.shift();
+            window.redoStack = []; window.updateHistoryButtons();
+        };
+
+        window.undo = async () => {
+            if (window.undoStack.length === 0) return;
+            window.redoStack.push(JSON.stringify(window.schedule));
+            window.schedule = JSON.parse(window.undoStack.pop());
+            await window.saveToFirebase(); window.render(); window.updateHistoryButtons();
+        };
+
+        window.redo = async () => {
+            if (window.redoStack.length === 0) return;
+            window.undoStack.push(JSON.stringify(window.schedule));
+            window.schedule = JSON.parse(window.redoStack.pop());
+            await window.saveToFirebase(); window.render(); window.updateHistoryButtons();
+        };
+
+        window.updateHistoryButtons = () => {
+            document.getElementById('undoBtn').disabled = window.undoStack.length === 0;
+            document.getElementById('redoBtn').disabled = window.redoStack.length === 0;
+        };
+
+        window.toggleView = () => {
+            window.showOnlyOff = !window.showOnlyOff;
+            const btn = document.getElementById('viewToggleBtn');
+            btn.classList.toggle('text-blue-500', window.showOnlyOff);
+            document.getElementById('viewIcon').setAttribute('data-lucide', window.showOnlyOff ? 'eye' : 'eye-off');
+            window.render(); lucide.createIcons();
+        };
+
+        window.enterApp = async () => {
+            document.getElementById('landingPage').style.display = 'none';
+            document.getElementById('app').classList.remove('hidden');
+            window.render(); 
+            await window.loadData();
+        };
+
+        window.loadData = async () => {
+            const getRef = (c, id) => window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', c, id);
+            const mKey = `${window.currentYear}-${window.currentMonth + 1}`;
+            window.onSnapshot(getRef('main_schedule', `current_${window.currentStore}`), s => { window.schedule = s.data()?.schedule || {}; window.render(); });
+            window.onSnapshot(getRef('personnel_config', `${mKey}_${window.currentStore}`), async (s) => { 
+                if(s.exists()){
+                    window.staffGroups = s.data()?.staffGroups || []; 
+                    window.requiredStaff = s.data()?.requiredStaffCount || 14;
+                    window.render(); 
+                }
+            });
+            window.onSnapshot(getRef('lock_state', 'current'), s => { window.lockedMonths = s.data()?.data || {}; window.render(); });
+            window.onSnapshot(getRef('footer_notes', `current_${window.currentStore}`), s => { 
+                if(s.exists()) {
+                    const notesDiv = document.getElementById('footerNotes');
+                    if (document.activeElement !== notesDiv) notesDiv.innerText = s.data().text; 
+                }
+            });
+            window.onSnapshot(getRef('custom_tags', 'current'), s => { window.customTags = s.data()?.tags || []; window.renderToolbar(); window.render(); });
+            window.updateHistoryButtons();
+        };
+
+        window.saveToFirebase = async () => {
+            const getRef = (c, id) => window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', c, id);
+            await window.fbSetDoc(getRef('main_schedule', `current_${window.currentStore}`), { schedule: window.schedule });
+            document.getElementById('syncTime').innerText = `${new Date().toLocaleTimeString()} SYNC`;
+        };
+
+        window.render = () => {
+            const days = new Date(window.currentYear, window.currentMonth + 1, 0).getDate();
+            const lockKey = `${window.currentYear}-${window.currentMonth + 1}`;
+            const isLocked = !!window.lockedMonths[lockKey];
+            const lockBtn = document.getElementById('lockStatusBtn');
+            const tableCont = document.getElementById('tableContainer');
+            
+            document.getElementById('monthDisplay').innerText = `${window.currentYear} / ${String(window.currentMonth + 1).padStart(2,'0')}`;
+
+            if(isLocked) {
+                document.getElementById('lockIcon').setAttribute('data-lucide', 'lock');
+                document.getElementById('lockText').innerText = "已鎖定編輯";
+                document.getElementById('lockText').className = "text-[11px] font-black text-rose-600 uppercase";
+                lockBtn.classList.add('animate-lock-breath-ring');
+                tableCont.classList.add('locked-overlay');
+            } else {
+                document.getElementById('lockIcon').setAttribute('data-lucide', 'unlock');
+                document.getElementById('lockText').innerText = "開放中";
+                document.getElementById('lockText').className = "text-[11px] font-black text-slate-500 uppercase";
+                lockBtn.classList.remove('animate-lock-breath-ring');
+                tableCont.classList.remove('locked-overlay');
+            }
+
+            const notesDiv = document.getElementById('footerNotes');
+            const loginBtn = document.getElementById('loginTrigger');
+            if(window.isAdmin) {
+                document.getElementById('statusLabel').innerText = "管理模式";
+                document.getElementById('statusLabel').className = "text-[9px] font-black animate-blink-red text-rose-500";
+                document.getElementById('quickLogoutBtn').classList.remove('hidden');
+                document.getElementById('loginLabel').innerText = "管理者";
+                loginBtn.classList.replace('bg-slate-800', 'bg-emerald-600');
+                notesDiv.contentEditable = "true";
+            } else {
+                document.getElementById('statusLabel').innerText = "Connected";
+                document.getElementById('statusLabel').className = "text-[9px] font-black text-slate-400";
+                document.getElementById('quickLogoutBtn').classList.add('hidden');
+                document.getElementById('loginLabel').innerText = "管理";
+                loginBtn.classList.replace('bg-emerald-600', 'bg-slate-800');
+                notesDiv.contentEditable = "false";
+            }
+
+            let colHtml = `<col style="width: var(--col-name);"><col style="width: var(--col-shift);">`;
+            for(let i=1; i<=days; i++) colHtml += `<col style="width: var(--col-day);">`;
+            colHtml += `<col style="width: 35px;">`;
+            document.getElementById('mainColgroup').innerHTML = colHtml;
+
+            const totalStaff = window.staffGroups.reduce((acc, g) => acc + (g.members?.length || 0), 0);
+
+            let h0 = `<tr><th rowspan="3" class="frame-b-name text-center">
+                <div class="flex flex-col gap-0.5 p-0.5 text-[7.5px] font-bold leading-tight w-full h-full justify-center">
+                    <div class="flex justify-between items-center bg-slate-50 p-1 rounded border border-slate-200 mx-0.5">
+                        <span>應有</span>
+                        <div class="flex items-center gap-0.5">
+                            ${window.isAdmin ? `<button onclick="window.adjReq(-1)" class="stepper-btn no-print"><i data-lucide="minus" class="w-2 h-2"></i></button>` : ''}
+                            <span class="w-3 text-center font-black text-blue-600">${window.requiredStaff}</span>
+                            ${window.isAdmin ? `<button onclick="window.adjReq(1)" class="stepper-btn no-print"><i data-lucide="plus" class="w-2 h-2"></i></button>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex justify-between px-1.5 py-0.5"><span>現有</span><span>${totalStaff}</span></div>
+                    <div class="flex justify-between px-1.5 py-0.5 border-t border-slate-100"><span>待補</span><span class="${window.requiredStaff-totalStaff > 0 ? 'text-rose-500' : 'text-emerald-500'}">${Math.max(0, window.requiredStaff-totalStaff)}</span></div>
+                </div>
+            </th><th rowspan="3" class="frame-a-shift text-center">班</th>`;
+            let h1 = `<tr>`; let h2 = `<tr>`;
+
+            for(let d=1; d<=days; d++) {
+                const date = new Date(window.currentYear, window.currentMonth, d);
+                const ds = `${window.currentYear}-${String(window.currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const hData = window.HOLIDAY_DB[ds] || { n: "", r: false };
+                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                const colClass = (hData.r || isWeekend) ? 'is-holiday-bg' : '';
+                const txtClass = (hData.r || isWeekend) ? 'is-holiday-text' : 'text-slate-400 font-bold';
+                h0 += `<th class="${colClass} ${txtClass} text-center"><div class="vertical-holiday">${hData.n}</div></th>`;
+                h1 += `<th class="${colClass} ${txtClass} text-[8px] uppercase font-black text-center">${["日","一","二","三","四","五","六"][date.getDay()]}</th>`;
+                h2 += `<th class="${colClass} ${txtClass} text-[10px] font-black font-mono text-center">${d}</th>`;
+            }
+            document.getElementById('tableHead').innerHTML = h0 + `<th rowspan="3" class="w-8 text-slate-300 text-[9px] text-center">休</th></tr>` + h1 + `</tr>` + h2 + `</tr>`;
+
+            let bHtml = "";
+            const dailyOffStats = { morning: {}, others: {}, night: {} };
+            window.staffGroups.forEach((g, gi) => {
+                const gType = g.group.substring(0,1);
+                g.members.forEach((m, mi) => {
+                    let offCount = 0;
+                    let row = `<tr class="group-row-${gType}">`;
+                    row += `<td class="frame-b-name text-slate-600 font-bold px-1 truncate relative group text-center"
+                             draggable="${window.isAdmin}"
+                             ondragstart="window.handleDragStart(event, ${gi}, ${mi})"
+                             ondragover="event.preventDefault()"
+                             ondrop="window.handleDrop(event, ${gi}, ${mi})">
+                        <div class="flex items-center justify-center w-full h-full overflow-hidden">
+                            ${window.isAdmin ? `<i data-lucide="grip-vertical" class="w-3 h-3 drag-handle text-slate-300 mr-1 flex-shrink-0 no-print"></i>` : ''}
+                            <div class="truncate"><span>${m}</span></div>
+                            ${window.isAdmin ? `<button onclick="window.delStaff(${gi},${mi},'${m}')" class="hidden group-hover:inline-block text-rose-300 ml-1 no-print"><i data-lucide="minus-circle" class="w-3 h-3"></i></button>` : ''}
+                        </div>
+                    </td>`;
+                    if(mi === 0) {
+                        row += `<td rowspan="${g.members.length}" class="frame-a-shift text-[10px] text-slate-400 font-black text-center">
+                            <div class="flex flex-col items-center gap-1.5"><span>${gType}</span>${window.isAdmin ? `<button onclick="window.addStaff(${gi})" class="p-1 rounded-full bg-blue-500 text-white no-print"><i data-lucide="plus" class="w-2 h-2"></i></button>` : ''}</div>
+                        </td>`;
+                    }
+                    for(let d=1; d<=days; d++) {
+                        const ds = `${window.currentYear}-${String(window.currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                        let v = window.schedule[ds]?.[m] || "";
+                        const isCoreOff = (v === '休' || v === '特' || v === '補');
+                        if(isCoreOff) {
+                            offCount++;
+                            const sk = gType === "早" ? "morning" : (gType === "夜" ? "night" : "others");
+                            dailyOffStats[sk][d] = (dailyOffStats[sk][d] || 0) + 1;
+                        }
+                        const customTag = window.customTags.find(t => t.text === v);
+                        let cellStyle = customTag ? `background-color: ${customTag.color}` : "";
+                        let cellClass = v === '休' ? 'cell-off' : (['特','補'].includes(v) ? 'bg-slate-500 text-white' : window.getTimeAreaClass(v));
+                        if(customTag) cellClass = "cell-custom shadow-inner";
+                        if (window.showOnlyOff && v && !isCoreOff) { v = ""; cellClass = ""; cellStyle = ""; }
+                        row += `<td onclick="window.cellClick('${ds}', '${m}')" class="cursor-pointer border-r border-b text-[9px] text-center ${cellClass}" style="${cellStyle}">${v}</td>`;
+                    }
+                    bHtml += row + `<td class="bg-slate-50 font-mono font-bold text-blue-400 border-b border-l-2 text-center">${offCount}</td></tr>`;
+                });
+            });
+            document.getElementById('tableBody').innerHTML = bHtml;
+
+            let fHtml = "";
+            const statsCfg = [{ l: "早限制(1)", k: "morning", lim: 1 }, { l: "晚限制(3)", k: "others", lim: 3 }, { l: "夜限制(1)", k: "night", lim: 1 }];
+            statsCfg.forEach(s => {
+                let r = `<tr class="bg-slate-50/20 text-center"><td colspan="2" class="text-left pl-2 text-[7.5px] font-black text-slate-400 uppercase tracking-tighter">${s.l}</td>`;
+                for(let d=1; d<=days; d++) {
+                    const c = dailyOffStats[s.k][d] || 0;
+                    r += `<td class="text-[9px] font-black text-center ${c > s.lim ? 'text-rose-500 animate-pulse' : 'text-slate-300'}">${c||""}</td>`;
+                }
+                fHtml += r + `<td></td></tr>`;
+            });
+            document.getElementById('tableFoot').innerHTML = fHtml;
+            lucide.createIcons();
+        };
+
+        window.handleDragStart = (e, gi, mi) => { if(!window.isAdmin) return; window.dragSource = { gi, mi }; e.currentTarget.classList.add('dragging'); };
+        window.handleDrop = async (e, targetGi, targetMi) => {
+            e.preventDefault();
+            if(!window.isAdmin || !window.dragSource) return;
+            const sourceGi = window.dragSource.gi; const sourceMi = window.dragSource.mi;
+            const memberName = window.staffGroups[sourceGi].members[sourceMi];
+            window.staffGroups[sourceGi].members.splice(sourceMi, 1);
+            window.staffGroups[targetGi].members.splice(targetMi, 0, memberName);
+            window.dragSource = null; await window.saveStaff();
+        };
+
+        window.addStaff = async (gi) => {
+            if(!window.isAdmin) return;
+            const name = prompt("請輸入人員姓名：");
+            if (name && name.trim()) { window.staffGroups[gi].members.push(name.trim()); await window.saveStaff(); }
+        };
+
+        window.delStaff = async (gi, mi, name) => {
+            if(!window.isAdmin) return;
+            if (confirm(`確定移除 [${name}] 嗎？`)) { window.staffGroups[gi].members.splice(mi, 1); await window.saveStaff(); }
+        };
+
+        window.adjReq = (delta) => { if(!window.isAdmin) return; window.updateRequired(window.requiredStaff + delta); };
+        window.updateRequired = async (val) => { window.requiredStaff = parseInt(val) || 0; await window.saveStaff(); };
+
+        window.saveStaff = async () => {
+            const mKey = `${window.currentYear}-${window.currentMonth + 1}`;
+            const getRef = (c, id) => window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', c, id);
+            await window.fbSetDoc(getRef('personnel_config', `${mKey}_${window.currentStore}`), { staffGroups: window.staffGroups, requiredStaffCount: window.requiredStaff });
+            window.render();
+        };
+
+        window.renderToolbar = () => {
+            const core = [{ id: "CLEAR", label: "清", bg: "bg-slate-100 text-slate-400" },{ id: "休", label: "休", bg: "cell-off" },{ id: "特", label: "特", bg: "bg-slate-500 text-white" },{ id: "補", label: "補", bg: "bg-slate-500 text-white" }];
+            let html = core.map(t => `<button onclick="window.selectedTool='${t.id}'; window.renderToolbar();" class="px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all ${t.bg} ${window.selectedTool === t.id ? 'ring-2 ring-slate-900 ring-offset-1 scale-105' : 'opacity-60'}">${t.label}</button>`).join('');
+            if(window.isAdmin) {
+                window.customTags.forEach(t => {
+                    html += `<button onclick="window.selectedTool='${t.text}'; window.renderToolbar();" class="px-2.5 py-1.5 rounded-lg text-[9px] font-black text-white transition-all ${window.selectedTool === t.text ? 'ring-2 ring-slate-900 ring-offset-1 scale-105' : 'opacity-60'}" style="background-color: ${t.color}">${t.text}</button>`;
+                });
+            }
+            document.getElementById('toolbar').innerHTML = html;
+        };
+
+        window.cellClick = async (ds, m) => {
+            if(!window.isAdmin && !!window.lockedMonths[`${window.currentYear}-${window.currentMonth + 1}`]) return;
+            if(!window.schedule[ds]) window.schedule[ds] = {};
+            window.pushToUndo();
+            if(window.selectedTool === "CLEAR") delete window.schedule[ds][m]; else window.schedule[ds][m] = window.selectedTool;
+            await window.saveToFirebase(); window.render();
+        };
+
+        window.handleLoginBtnClick = () => { if(window.isAdmin) window.renderAdminTools(); else window.openLogin(); };
+
+        window.openLogin = () => {
+            const box = document.getElementById('modalBox');
+            box.innerHTML = `
+                <div class="p-8 text-center">
+                    <div class="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-100"><i data-lucide="shield-check" class="w-7 h-7 text-slate-700"></i></div>
+                    <h3 class="text-xl font-black text-slate-800 tracking-tight">管理者驗證</h3>
+                    <input type="password" id="pwdIn" class="w-full mt-6 bg-slate-50 border border-slate-200 rounded-xl py-5 text-center text-4xl font-black tracking-[0.4em] outline-none" onkeydown="if(event.key==='Enter') window.verify()">
+                    <div class="grid grid-cols-2 gap-3 mt-8"><button onclick="window.closeModal()" class="py-4 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition text-sm">取消</button><button onclick="window.verify()" class="bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg text-sm">確認</button></div>
+                </div>`;
+            document.getElementById('modalOverlay').classList.remove('hidden');
+            setTimeout(() => document.getElementById('pwdIn').focus(), 100);
+            lucide.createIcons();
+        };
+
+        window.handleLockClick = () => {
+             if (!window.isAdmin) window.openLogin();
+             else {
+                 const key = `${window.currentYear}-${window.currentMonth + 1}`;
+                 window.lockedMonths[key] = !window.lockedMonths[key];
+                 const getRef = (c, id) => window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', c, id);
+                 window.fbSetDoc(getRef('lock_state', 'current'), { data: window.lockedMonths });
+             }
+        };
+
+        window.verify = () => {
+            if(document.getElementById('pwdIn').value === window.PASS_MASTER) {
+                window.isAdmin = true; window.closeModal(); window.renderAdminTools(); window.render(); window.renderToolbar();
+            } else { alert("金鑰錯誤"); document.getElementById('pwdIn').value = ""; }
+        };
+
+        window.renderAdminTools = () => {
+            const box = document.getElementById('modalBox');
+            box.innerHTML = `
+                <div class="bg-slate-900 p-4 flex items-center justify-between text-white"><div class="flex items-center gap-2 text-xs font-black uppercase">Admin Console</div><button onclick="window.closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+                <div class="p-6 bg-white space-y-3">
+                    <button class="admin-btn" onclick="window.openTagManager()"><i data-lucide="tags" class="w-5 h-5"></i> 標記管理</button>
+                    <button class="admin-btn" onclick="window.print()"><i data-lucide="printer" class="w-5 h-5"></i> 輸出排班表</button>
+                    <button class="admin-btn" onclick="window.forceImportMarch()"><i data-lucide="download-cloud" class="w-5 h-5"></i> 強制導入 3 月名單</button>
+                    <div class="pt-4 border-t"><button onclick="window.logout()" class="text-rose-500 font-black text-xs uppercase w-full py-3 bg-rose-50 rounded-xl">Logout System</button></div>
+                </div>`;
+            document.getElementById('modalOverlay').classList.remove('hidden'); lucide.createIcons();
+        };
+
+        window.forceImportMarch = async () => {
+            if (!confirm("確定要導入 3 月份的名單嗎？")) return;
+            const getRef = (c, id) => window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', c, id);
+            const marchRef = getRef('personnel_config', `2026-3_${window.currentStore}`);
+            const marchSnap = await window.fbGetDoc(marchRef);
+            if (marchSnap.exists()) {
+                window.staffGroups = marchSnap.data().staffGroups;
+                window.requiredStaff = marchSnap.data().requiredStaffCount;
+                await window.saveStaff();
+                alert("導入完成！");
+                window.closeModal();
+            }
+        };
+
+        window.openTagManager = () => {
+            const box = document.getElementById('modalBox');
+            const tagsHtml = window.customTags.map((t, i) => `
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl mb-2 border">
+                    <div class="flex items-center gap-3"><div class="w-5 h-5 rounded shadow-sm" style="background-color: ${t.color}"></div><span class="font-black text-slate-700">${t.text}</span></div>
+                    <button onclick="window.deleteTag(${i})" class="text-rose-400 hover:text-rose-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>`).join('');
+            
+            // [關鍵修復] 顏色選擇器的 HTML 生成與渲染
+            const colorsHtml = PRESET_COLORS.map(c => `
+                <div onclick="window.selectTagColor('${c}', this)" 
+                     class="tag-color-picker ${c === window.currentSelectedColor ? 'active' : ''}" 
+                     style="background-color: ${c}">
+                </div>`).join('');
+
+            box.innerHTML = `
+                <div class="bg-slate-800 p-4 flex items-center justify-between text-white">
+                    <div class="flex items-center gap-2"><i data-lucide="tags"></i><span class="font-black text-sm">標記管理</span></div>
+                    <button onclick="window.renderAdminTools()"><i data-lucide="arrow-left"></i></button>
+                </div>
+                <div class="p-6 bg-white max-h-[500px] overflow-y-auto">
+                    <div class="mb-4">${tagsHtml || '<p class="text-center py-4 text-slate-300 font-bold">目前無自定義標記</p>'}</div>
+                    <div class="pt-4 border-t">
+                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">新增標記</label>
+                        <input type="text" id="newTagText" maxlength="4" placeholder="標記名稱 (如: 支援)" 
+                               class="w-full bg-slate-50 border p-3 rounded-xl font-bold mb-3 outline-none text-sm focus:border-blue-500 transition-all">
+                        <div class="grid grid-cols-4 gap-3 mb-5">${colorsHtml}</div>
+                        <button onclick="window.addTag()" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-black shadow-lg hover:bg-slate-800 transition-all">
+                            新增標記工具
+                        </button>
+                    </div>
+                </div>`;
+            lucide.createIcons();
+        };
+
+        window.selectTagColor = (c, el) => { 
+            window.currentSelectedColor = c; 
+            document.querySelectorAll('.tag-color-picker').forEach(p => p.classList.remove('active')); 
+            el.classList.add('active'); 
+        };
+
+        window.addTag = async () => {
+            const t = document.getElementById('newTagText').value.trim(); 
+            if (!t) return; 
+            window.customTags.push({ text: t, color: window.currentSelectedColor });
+            const getRef = (c, id) => window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', c, id);
+            await window.fbSetDoc(getRef('custom_tags', 'current'), { tags: window.customTags }); 
+            window.openTagManager();
+        };
+
+        window.deleteTag = async (idx) => {
+            window.customTags.splice(idx, 1);
+            const getRef = (c, id) => window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', c, id);
+            await window.fbSetDoc(getRef('custom_tags', 'current'), { tags: window.customTags }); 
+            window.openTagManager();
+        };
+
+        window.logout = () => { window.isAdmin = false; window.closeModal(); window.render(); window.renderToolbar(); };
+        window.closeModal = () => document.getElementById('modalOverlay').classList.add('hidden');
+        window.changeMonth = async (v) => { window.currentMonth += v; if(window.currentMonth>11){window.currentMonth=0;window.currentYear++;} if(window.currentMonth<0){window.currentMonth=11;window.currentYear--;} window.render(); await window.loadData(); };
+        window.saveFooter = async () => {
+            const getRef = (c, id) => window.fbDoc(window.db, 'artifacts', window.appId, 'public', 'data', c, id);
+            await window.fbSetDoc(getRef('footer_notes', `current_${window.currentStore}`), { text: document.getElementById('footerNotes').innerText });
+        };
+    </script>
 </body>
 </html>
