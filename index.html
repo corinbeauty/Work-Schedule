@@ -41,6 +41,7 @@
         window.showOnlyOff = false; window.customTags = []; 
         window.posMapping = {}; // 崗位配對數據 { "人名": "崗位" }
         window.currentSelectedColor = "#1e293b";
+        window.isAiLoading = false;
         
         window.undoStack = [];
         window.redoStack = [];
@@ -74,6 +75,14 @@
             }, 5000);
         };
         initAuth();
+
+        // 輔助函式：將 Date 物件轉為 YYYY-MM-DD
+        window.toDateKey = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
     </script>
 
     <style>
@@ -140,6 +149,17 @@
         .tag-color-picker.active { border-color: #0f172a; transform: scale(1.15); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .admin-btn { width: 100%; padding: 12px; margin-bottom: 6px; border-radius: 12px; display: flex; align-items: center; gap: 10px; font-weight: 700; background: #f8fafc; border: 1px solid #f1f5f9; transition: all 0.2s; text-align: left; font-size: 0.75rem; }
         .admin-btn:hover { background: #f1f5f9; transform: translateY(-1px); }
+
+        /* AI 載入中動畫 */
+        @keyframes ai-shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .ai-loading-bar {
+            background: linear-gradient(90deg, #3b82f6 25%, #60a5fa 50%, #3b82f6 75%);
+            background-size: 200% 100%;
+            animation: ai-shimmer 2s infinite linear;
+        }
 
         /* 週期卡片樣式修正與列印 */
         .weekly-card {
@@ -210,6 +230,11 @@
         <h2 class="text-white text-lg font-black tracking-widest uppercase opacity-80">CONNECTED</h2>
     </div>
 
+    <!-- AI 載入進度條 -->
+    <div id="aiLoadingIndicator" class="fixed top-0 left-0 w-full h-1 z-[20000] hidden">
+        <div class="ai-loading-bar w-full h-full"></div>
+    </div>
+
     <div id="app" class="hidden max-w-[2200px] mx-auto">
         <header class="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 gap-4 no-print">
             <div class="space-y-2">
@@ -233,7 +258,15 @@
                     <button id="redoBtn" onclick="window.redo()" class="p-2 rounded-lg hover:bg-slate-50 text-slate-400 disabled:opacity-20 transition-all" title="重做"><i data-lucide="redo-2" class="w-4 h-4"></i></button>
                 </div>
                 <div id="toolbar" class="flex gap-1 overflow-x-auto max-w-[450px] no-scrollbar"></div>
+                
                 <div class="w-px h-6 bg-slate-100 mx-1"></div>
+                
+                <!-- AI 智慧排班按鈕 -->
+                <button id="aiAutoFillBtn" onclick="window.aiAutoFill()" class="p-2 rounded-xl border border-blue-200 text-blue-500 hover:bg-blue-50 flex items-center gap-2 px-3 transition-all hidden group">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5 group-hover:animate-spin"></i>
+                    <span class="text-[9px] font-black uppercase">AI 排班</span>
+                </button>
+
                 <button onclick="window.toggleView()" id="viewToggleBtn" class="p-2 rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50 flex items-center gap-2 px-3 transition-colors">
                     <i data-lucide="eye-off" id="viewIcon" class="w-3.5 h-3.5"></i>
                     <span class="text-[9px] font-black uppercase">精簡</span>
@@ -266,7 +299,7 @@
                         <div id="statusDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
                         <span id="statusLabel" class="text-[9px] font-black text-slate-400 uppercase">Connected</span>
                     </div>
-                    <span class="text-[8px] text-slate-300 font-bold uppercase tracking-widest">v5.7.FINAL</span>
+                    <span class="text-[8px] text-slate-300 font-bold uppercase tracking-widest">v6.1.PRO</span>
                 </div>
                 <div class="flex justify-between items-center">
                     <span id="syncTime" class="text-[10px] font-bold text-slate-600 font-mono truncate">STANDBY</span>
@@ -428,12 +461,14 @@
                 document.getElementById('quickLogoutBtn').classList.remove('hidden');
                 document.getElementById('loginLabel').innerText = "管理者";
                 loginBtn.classList.replace('bg-slate-800', 'bg-emerald-600');
+                document.getElementById('aiAutoFillBtn').classList.remove('hidden');
             } else {
                 document.getElementById('statusLabel').innerText = "Connected";
                 document.getElementById('statusLabel').className = "text-[9px] font-black text-slate-400";
                 document.getElementById('quickLogoutBtn').classList.add('hidden');
                 document.getElementById('loginLabel').innerText = "管理";
                 loginBtn.classList.replace('bg-emerald-600', 'bg-slate-800');
+                document.getElementById('aiAutoFillBtn').classList.add('hidden');
             }
 
             let colHtml = `<col style="width: var(--col-name);"><col style="width: var(--col-shift);">`;
@@ -499,7 +534,8 @@
                     for(let d=1; d<=days; d++) {
                         const ds = `${window.currentYear}-${String(window.currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                         let v = window.schedule[ds]?.[m] || "";
-                        const isCoreOff = (v === '休' || v === '特' || v === '補');
+                        // [計數更新] 新增 "排休" 判斷
+                        const isCoreOff = (v === '休' || v === '排休' || v === '特' || v === '補');
                         if(isCoreOff) {
                             offCount++;
                             const sk = gType === "早" ? "morning" : (gType === "夜" ? "night" : "others");
@@ -507,7 +543,8 @@
                         }
                         const customTag = window.customTags.find(t => t.text === v);
                         let cellStyle = customTag ? `background-color: ${customTag.color}` : "";
-                        let cellClass = v === '休' ? 'cell-off' : (['特','補'].includes(v) ? 'bg-slate-500 text-white' : window.getTimeAreaClass(v));
+                        // [視覺更新] 排休背景色採用 cell-off (紅色)
+                        let cellClass = (v === '休' || v === '排休') ? 'cell-off' : (['特','補'].includes(v) ? 'bg-slate-500 text-white' : window.getTimeAreaClass(v));
                         if(customTag) cellClass = "cell-custom shadow-inner";
                         if (window.showOnlyOff && v && !isCoreOff) { v = ""; cellClass = ""; cellStyle = ""; }
                         row += `<td onclick="window.cellClick('${ds}', '${m}')" class="cursor-pointer border-r border-b text-[9px] text-center ${cellClass}" style="${cellStyle}">${v}</td>`;
@@ -529,6 +566,85 @@
             });
             document.getElementById('tableFoot').innerHTML = fHtml;
             lucide.createIcons();
+        };
+
+        // AI 智慧排班
+        window.aiAutoFill = async () => {
+            if (!window.isAdmin || window.isAiLoading) return;
+            if (!confirm(`AI 將根據歷史紀錄自動「填補」 ${window.currentMonth + 1} 月的排班空白處。\n已填寫的內容（時間、休假、特休等）將會保留，是否繼續？`)) return;
+
+            window.isAiLoading = true;
+            document.getElementById('aiLoadingIndicator').classList.remove('hidden');
+            document.getElementById('aiAutoFillBtn').disabled = true;
+
+            try {
+                const daysInMonth = new Date(window.currentYear, window.currentMonth + 1, 0).getDate();
+                const allStaff = window.staffGroups.flatMap(g => g.members);
+                const currentMonthKey = `${window.currentYear}-${String(window.currentMonth + 1).padStart(2, '0')}`;
+                
+                const historyData = JSON.stringify(window.schedule);
+                const holidayInfo = JSON.stringify(window.HOLIDAY_DB);
+                const staffList = allStaff.join(', ');
+
+                const systemPrompt = `你是一位專業的飯店排班分析師。請根據提供的歷史排班紀錄（JSON格式），學習員工的排班規律（誰習慣休週幾、誰通常上什麼時段）。
+                重要規則：
+                1. 僅針對本月排班表中的「空白處」提供建議。
+                2. 如果某個員工在某天已經有資料（如 '休', '排休', '特', '補' 或特定時間），請「絕對不要更動」或「覆蓋」該內容。
+                3. 輸出的 JSON 格式必須為: {"YYYY-MM-DD": {"員工名": "建議班次", ...}, ...}
+                4. 只生成 ${currentMonthKey}-01 到 ${currentMonthKey}-${daysInMonth} 的日期。
+                5. 班次類型包含: '休', '排休', '0800-1530', '1630-1830', '1930-2350'。
+                6. 優先保證每個人的休假規律。
+                7. 嚴格遵守早班(1人休)、晚班(3人休)、夜班(1人休)的限制。
+                8. 僅回傳純 JSON 內容。`;
+
+                const result = await window.callGemini(`歷史紀錄: ${historyData}\n當月節日: ${holidayInfo}\n員工名單: ${staffList}`, systemPrompt);
+                
+                if (result) {
+                    const aiSchedule = JSON.parse(result.replace(/```json|```/g, '').trim());
+                    window.pushToUndo();
+                    Object.keys(aiSchedule).forEach(date => {
+                        if (!window.schedule[date]) window.schedule[date] = {};
+                        allStaff.forEach(m => {
+                            if (!window.schedule[date][m] && aiSchedule[date]?.[m]) {
+                                window.schedule[date][m] = aiSchedule[date][m];
+                            }
+                        });
+                    });
+                    await window.saveToFirebase();
+                    window.render();
+                    alert(`AI 智慧填補已完成！`);
+                }
+            } catch (err) {
+                console.error("AI Error:", err);
+                alert("AI 生成過程中發生錯誤。");
+            } finally {
+                window.isAiLoading = false;
+                document.getElementById('aiLoadingIndicator').classList.add('hidden');
+                document.getElementById('aiAutoFillBtn').disabled = false;
+                lucide.createIcons();
+            }
+        };
+
+        window.callGemini = async (userQuery, systemPrompt) => {
+            const apiKey = ""; 
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: { responseMimeType: "application/json" }
+            };
+            const retries = 5;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, { method: 'POST', body: JSON.stringify(payload) });
+                    const data = await response.json();
+                    return data.candidates[0].content.parts[0].text;
+                } catch (e) {
+                    if (i === retries - 1) throw e;
+                    await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+                }
+            }
+            return null;
         };
 
         window.handleDragStart = (e, gi, mi) => { if(!window.isAdmin) return; window.dragSource = { gi, mi }; e.currentTarget.classList.add('dragging'); };
@@ -563,8 +679,15 @@
             window.render();
         };
 
+        // [按鈕更新] 新增 "排休" 到常用工具列
         window.renderToolbar = () => {
-            const core = [{ id: "CLEAR", label: "清", bg: "bg-slate-100 text-slate-400" },{ id: "休", label: "休", bg: "cell-off" },{ id: "特", label: "特", bg: "bg-slate-500 text-white" },{ id: "補", label: "補", bg: "bg-slate-500 text-white" }];
+            const core = [
+                { id: "CLEAR", label: "清", bg: "bg-slate-100 text-slate-400" },
+                { id: "休", label: "休", bg: "cell-off" },
+                { id: "排休", label: "排休", bg: "cell-off" },
+                { id: "特", label: "特", bg: "bg-slate-500 text-white" },
+                { id: "補", label: "補", bg: "bg-slate-500 text-white" }
+            ];
             let html = core.map(t => `<button onclick="window.selectedTool='${t.id}'; window.renderToolbar();" class="px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all ${t.bg} ${window.selectedTool === t.id ? 'ring-2 ring-slate-900 ring-offset-1 scale-105' : 'opacity-60'}">${t.label}</button>`).join('');
             if(window.isAdmin) {
                 window.customTags.forEach(t => {
@@ -642,54 +765,15 @@
             return { display: `${startT}~${endT}`, startNum: parseInt(s), rawStart: s };
         };
 
-        // [核心修正] 崗位管理介面 - 簡化人員與崗位配對
         window.openPosMappingManager = () => {
             const box = document.getElementById('modalBox');
             box.style.maxWidth = "450px";
-            
-            // 抓取現有人員清單
             const allStaff = window.staffGroups.flatMap(g => g.members);
             const staffOptions = allStaff.map(s => `<option value="${s}">${s}</option>`).join('');
-            
             const tableRows = Object.entries(window.posMapping).map(([person, pos]) => {
-                return `
-                <tr class="text-[10px] border-b hover:bg-slate-50 transition">
-                    <td class="py-2 px-3 font-bold text-slate-700">${person}</td>
-                    <td class="py-2 px-3 font-bold">${pos}</td>
-                    <td class="py-2 px-3 text-right">
-                        <button onclick="window.deletePosMapping('${person}')" class="text-rose-400 hover:text-rose-600 transition p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                    </td>
-                </tr>`;
+                return `<tr class="text-[10px] border-b hover:bg-slate-50 transition"><td class="py-2 px-3 font-bold text-slate-700">${person}</td><td class="py-2 px-3 font-bold">${pos}</td><td class="py-2 px-3 text-right"><button onclick="window.deletePosMapping('${person}')" class="text-rose-400 hover:text-rose-600 transition p-1"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td></tr>`;
             }).join('');
-            
-            box.innerHTML = `
-                <div class="bg-slate-800 p-4 flex items-center justify-between text-white">
-                    <div class="flex items-center gap-2 font-black text-sm uppercase"><i data-lucide="briefcase" class="w-4 h-4"></i> 人員崗位配對</div>
-                    <button onclick="window.renderAdminTools()"><i data-lucide="arrow-left"></i></button>
-                </div>
-                <div class="p-6">
-                    <div class="mb-4 max-h-60 overflow-y-auto border rounded-xl bg-white shadow-inner">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-slate-100 text-[9px] uppercase font-black text-slate-500 sticky top-0">
-                                <tr><th class="py-2 px-3">人員姓名</th><th class="py-2 px-3">預設崗位</th><th class="py-2 px-3 text-right">操作</th></tr>
-                            </thead>
-                            <tbody>${tableRows || '<tr><td colspan="3" class="text-center text-slate-300 py-8">目前無配對設定</td></tr>'}</tbody>
-                        </table>
-                    </div>
-                    <div class="border-t pt-4 bg-slate-50 p-4 rounded-xl">
-                        <label class="text-[9px] font-black text-slate-400 mb-3 block uppercase tracking-widest">新增人員配對</label>
-                        <div class="flex flex-col gap-3">
-                            <select id="newPosStaff" class="w-full bg-white border p-3 rounded-xl font-bold outline-none text-sm">
-                                <option value="">-- 請選擇人員 --</option>
-                                ${staffOptions}
-                            </select>
-                            <div class="flex gap-2">
-                                <input type="text" id="newPosName" placeholder="崗位名稱 (如: 櫃檯)" class="flex-1 bg-white border p-3 rounded-xl font-bold outline-none text-sm">
-                                <button onclick="window.addPosMapping()" class="bg-emerald-600 text-white px-6 rounded-xl font-black shadow-lg hover:bg-emerald-500 transition-all flex items-center justify-center"><i data-lucide="plus" class="w-5 h-5"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
+            box.innerHTML = `<div class="bg-slate-800 p-4 flex items-center justify-between text-white"><div class="flex items-center gap-2 font-black text-sm uppercase"><i data-lucide="briefcase" class="w-4 h-4"></i> 人員崗位配對</div><button onclick="window.renderAdminTools()"><i data-lucide="arrow-left"></i></button></div><div class="p-6"><div class="mb-4 max-h-60 overflow-y-auto border rounded-xl bg-white shadow-inner"><table class="w-full text-left border-collapse"><thead class="bg-slate-100 text-[9px] uppercase font-black text-slate-500 sticky top-0"><tr><th class="py-2 px-3">人員姓名</th><th class="py-2 px-3">預設崗位</th><th class="py-2 px-3 text-right">操作</th></tr></thead><tbody>${tableRows || '<tr><td colspan="3" class="text-center text-slate-300 py-8">目前無配對設定</td></tr>'}</tbody></table></div><div class="border-t pt-4 bg-slate-50 p-4 rounded-xl"><label class="text-[9px] font-black text-slate-400 mb-3 block uppercase tracking-widest">新增人員配對</label><div class="flex flex-col gap-3"><select id="newPosStaff" class="w-full bg-white border p-3 rounded-xl font-bold outline-none text-sm"><option value="">-- 請選擇人員 --</option>${staffOptions}</select><div class="flex gap-2"><input type="text" id="newPosName" placeholder="崗位名稱 (如: 櫃檯)" class="flex-1 bg-white border p-3 rounded-xl font-bold outline-none text-sm"><button onclick="window.addPosMapping()" class="bg-emerald-600 text-white px-6 rounded-xl font-black shadow-lg hover:bg-emerald-500 transition-all flex items-center justify-center"><i data-lucide="plus" class="w-5 h-5"></i></button></div></div></div></div>`;
             lucide.createIcons();
         };
 
@@ -708,9 +792,15 @@
             window.openPosMappingManager();
         };
 
+        // 修正輸出週期班表功能
         window.openWeeklyPrintSelector = () => {
             const box = document.getElementById('modalBox');
             box.style.maxWidth = "400px";
+            
+            // 生成當月第一天與最後一天作為預設值，避免時區偏移
+            const firstDate = new Date(window.currentYear, window.currentMonth, 1);
+            const lastDate = new Date(window.currentYear, window.currentMonth + 1, 0);
+            
             box.innerHTML = `
                 <div class="bg-slate-800 p-4 flex items-center justify-between text-white">
                     <div class="flex items-center gap-2 font-black text-sm uppercase">週期班表輸出</div>
@@ -720,11 +810,11 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">開始日期</label>
-                            <input type="date" id="printStart" class="w-full bg-slate-50 border p-4 rounded-xl font-bold outline-none">
+                            <input type="date" id="printStart" value="${window.toDateKey(firstDate)}" class="w-full bg-slate-50 border p-4 rounded-xl font-bold outline-none">
                         </div>
                         <div>
                             <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">結束日期</label>
-                            <input type="date" id="printEnd" class="w-full bg-slate-50 border p-4 rounded-xl font-bold outline-none">
+                            <input type="date" id="printEnd" value="${window.toDateKey(lastDate)}" class="w-full bg-slate-50 border p-4 rounded-xl font-bold outline-none">
                         </div>
                     </div>
                     <button onclick="window.generateWeeklyPrint()" class="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-xl hover:bg-blue-500 transition-all flex items-center justify-center gap-3">
@@ -732,92 +822,56 @@
                     </button>
                 </div>`;
             lucide.createIcons();
-            const first = new Date(window.currentYear, window.currentMonth, 1).toISOString().split('T')[0];
-            const last = new Date(window.currentYear, window.currentMonth + 1, 0).toISOString().split('T')[0];
-            document.getElementById('printStart').value = first;
-            document.getElementById('printEnd').value = last;
         };
 
         window.generateWeeklyPrint = () => {
             const startStr = document.getElementById('printStart').value;
             const endStr = document.getElementById('printEnd').value;
             if (!startStr || !endStr) return;
-            const start = new Date(startStr);
-            const end = new Date(endStr);
+            
+            // 轉換為當地時間 Date 物件
+            const startDateParts = startStr.split('-').map(Number);
+            const endDateParts = endStr.split('-').map(Number);
+            const start = new Date(startDateParts[0], startDateParts[1] - 1, startDateParts[2]);
+            const end = new Date(endDateParts[0], endDateParts[1] - 1, endDateParts[2]);
+            
             let cardsHtml = "";
-
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                const ds = d.toISOString().split('T')[0];
+                // 使用 formatDateKey 確保查詢字串與儲存字串完全匹配
+                const ds = window.toDateKey(d);
                 const dayName = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"][d.getDay()];
                 const hData = window.HOLIDAY_DB[ds] || { n: "", r: false };
                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                 let offList = []; let onDuty = [];
+                
                 window.staffGroups.forEach(g => {
                     g.members.forEach(m => {
                         const shift = window.schedule[ds]?.[m] || "";
-                        if (['休', '特', '補'].includes(shift)) offList.push(m);
+                        // [計數更新] 新增 "排休" 判斷
+                        if (['休', '排休', '特', '補'].includes(shift)) offList.push(m);
                         else if (shift) onDuty.push({ name: m, time: shift });
                     });
                 });
+                
                 const titleColor = (hData.r || isWeekend) ? 'text-rose-600' : 'text-slate-800';
                 let rowHtml = ""; let countM = 1, countA = 1, countE = 1;
                 for (let i = 0; i < 12; i++) {
                     const staff = onDuty[i] || { name: "", time: "" };
                     const timeObj = window.formatShiftTime(staff.time);
                     let markerM = "", markerA = "", markerE = "";
-                    
-                    // [簡化修正] 僅根據人名查找崗位
                     let posName = staff.name ? (window.posMapping[staff.name] || "待補") : "";
-                    
                     if(timeObj.startNum !== null) {
                         if(timeObj.startNum >= 800 && timeObj.startNum <= 1530) markerM = countM++;
                         if(timeObj.startNum >= 1530 && timeObj.startNum <= 2100) markerA = countA++;
                         if(timeObj.startNum >= 1730 && timeObj.startNum <= 2350) markerE = countE++;
                     }
-                    
                     const markerStyle = 'style="color: #ff0000 !important; font-weight: 900 !important; font-size: 13px !important;"';
-
-                    rowHtml += `
-                        <tr>
-                            <td contenteditable="true" style="font-family: monospace;">${timeObj.display === "--" ? "" : timeObj.display}</td>
-                            <td contenteditable="true" style="font-weight:bold;">${staff.name}</td>
-                            <td contenteditable="true">${posName}</td>
-                            <td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerM}</td>
-                            <td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerA}</td>
-                            <td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerE}</td>
-                        </tr>`;
+                    rowHtml += `<tr><td contenteditable="true" style="font-family: monospace;">${timeObj.display === "--" ? "" : timeObj.display}</td><td contenteditable="true" style="font-weight:bold;">${staff.name}</td><td contenteditable="true">${posName}</td><td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerM}</td><td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerA}</td><td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerE}</td></tr>`;
                 }
-                cardsHtml += `
-                    <div class="weekly-card">
-                        <div class="weekly-card-header">
-                            <h2 class="text-[11px] font-black ${titleColor}">${d.getMonth()+1}/${d.getDate()} (${dayName}) <span class="text-rose-500 ml-1">${hData.n ? '['+hData.n+']' : ''}</span></h2>
-                        </div>
-                        <table class="weekly-table">
-                            <thead><tr class="bg-slate-50"><th style="width:70px">時間</th><th style="width:60px">人</th><th style="width:45px">崗位</th><th style="width:20px">早</th><th style="width:20px">中</th><th style="width:20px">晚</th></tr></thead>
-                            <tbody>${rowHtml}</tbody>
-                        </table>
-                        <div class="weekly-footer">
-                            <div class="truncate w-2/3" contenteditable="true">休：<span class="font-bold">${offList.join('、') || '無'}</span></div>
-                            <div class="text-right">發券：_______</div>
-                        </div>
-                    </div>`;
+                cardsHtml += `<div class="weekly-card"><div class="weekly-card-header"><h2 class="text-[11px] font-black ${titleColor}">${d.getMonth()+1}/${d.getDate()} (${dayName}) <span class="text-rose-500 ml-1">${hData.n ? '['+hData.n+']' : ''}</span></h2></div><table class="weekly-table"><thead><tr class="bg-slate-50"><th style="width:70px">時間</th><th style="width:60px">人</th><th style="width:45px">崗位</th><th style="width:20px">早</th><th style="width:20px">中</th><th style="width:20px">晚</th></tr></thead><tbody>${rowHtml}</tbody></table><div class="weekly-footer"><div class="truncate w-2/3" contenteditable="true">休：<span class="font-bold">${offList.join('、') || '無'}</span></div><div class="text-right">發券：_______</div></div></div>`;
             }
-
-            const box = document.getElementById('modalBox');
-            box.style.maxWidth = "1400px"; box.style.width = "98%";
-            box.innerHTML = `
-                <div class="bg-slate-900 p-4 flex items-center justify-between text-white no-print">
-                    <div class="flex items-center gap-4">
-                        <button onclick="window.openWeeklyPrintSelector()" class="text-slate-400 hover:text-white"><i data-lucide="arrow-left"></i></button>
-                        <span class="font-black text-sm uppercase">週期班表預覽 (可直接點擊表格修改)</span>
-                    </div>
-                    <button onclick="window.print()" class="bg-blue-600 px-6 py-2 rounded-lg font-black text-xs shadow-xl flex items-center gap-2"><i data-lucide="printer"></i> 列印 PDF / 紙本</button>
-                </div>
-                <div class="max-h-[85vh] overflow-auto bg-slate-100 p-4">
-                    <div class="print-preview-container">
-                        <div class="weekly-grid flex flex-wrap gap-[8px] justify-center">${cardsHtml}</div>
-                    </div>
-                </div>`;
+            const box = document.getElementById('modalBox'); box.style.maxWidth = "1400px"; box.style.width = "98%";
+            box.innerHTML = `<div class="bg-slate-900 p-4 flex items-center justify-between text-white no-print"><div class="flex items-center gap-4"><button onclick="window.openWeeklyPrintSelector()" class="text-slate-400 hover:text-white"><i data-lucide="arrow-left"></i></button><span class="font-black text-sm uppercase">週期班表預覽 (可直接點擊表格修改)</span></div><button onclick="window.print()" class="bg-blue-600 px-6 py-2 rounded-lg font-black text-xs shadow-xl flex items-center gap-2"><i data-lucide="printer"></i> 列印 PDF / 紙本</button></div><div class="max-h-[85vh] overflow-auto bg-slate-100 p-4"><div class="print-preview-container"><div class="weekly-grid flex flex-wrap gap-[8px] justify-center">${cardsHtml}</div></div></div>`;
             lucide.createIcons();
         };
 
@@ -829,7 +883,7 @@
             let h1 = `<tr>`; let h2 = `<tr>`;
             for(let d=1; d<=days; d++) {
                 const date = new Date(window.currentYear, window.currentMonth, d);
-                const ds = `${window.currentYear}-${String(window.currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const ds = window.toDateKey(date);
                 const hData = window.HOLIDAY_DB[ds] || { n: "", r: false };
                 const isWeekend = date.getDay() === 0 || date.getDay() === 6;
                 const headerBg = (hData.r || isWeekend) ? '#fff1f2' : 'white';
@@ -838,7 +892,6 @@
                 h2 += `<th style="font-size:10px; font-family: monospace; background-color:${headerBg} !important;">${d}</th>`;
             }
             tableHtml += `<thead>` + h0 + `<th rowspan="3" style="width:30px">休</th></tr>` + h1 + `</tr>` + h2 + `</tr></thead><tbody>`;
-
             const dailyOffStats = { morning: {}, others: {}, night: {} };
             window.staffGroups.forEach((g) => {
                 const gType = g.group.substring(0,1);
@@ -846,17 +899,19 @@
                     let offCount = 0; tableHtml += `<tr><td style="font-weight:bold; font-size:11px;">${m}</td>`;
                     if(mi === 0) tableHtml += `<td rowspan="${g.members.length}" style="font-weight:900;">${gType}</td>`;
                     for(let d=1; d<=days; d++) {
-                        const ds = `${window.currentYear}-${String(window.currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                        const date = new Date(window.currentYear, window.currentMonth, d);
+                        const ds = window.toDateKey(date);
                         const v = window.schedule[ds]?.[m] || "";
                         const customTag = window.customTags.find(t => t.text === v);
                         let cellBg = "white"; let cellColor = "black";
-                        if (v === '休') { cellBg = "#fb7185"; cellColor = "white"; offCount++; }
+                        // [計數更新] 全月報表同步計入 "排休"
+                        if (v === '休' || v === '排休') { cellBg = "#fb7185"; cellColor = "white"; offCount++; }
                         else if (['特','補'].includes(v)) { cellBg = "#64748b"; cellColor = "white"; offCount++; }
                         else if (customTag) { cellBg = customTag.color; cellColor = "white"; }
                         else if (v === "0800-1530") cellBg = "#dcfce7";
                         else if (v === "1630-1830") cellBg = "#fef9c3";
                         else if (v === "1930-2350") cellBg = "#dbeafe";
-                        if(['休','特','補'].includes(v)) {
+                        if(['休','排休','特','補'].includes(v)) {
                             const sk = gType === "早" ? "morning" : (gType === "夜" ? "night" : "others");
                             dailyOffStats[sk][d] = (dailyOffStats[sk][d] || 0) + 1;
                         }
@@ -866,8 +921,7 @@
                 });
             });
             tableHtml += `</tbody></table></div>`;
-            const box = document.getElementById('modalBox');
-            box.style.maxWidth = "1400px"; box.style.width = "98%";
+            const box = document.getElementById('modalBox'); box.style.maxWidth = "1400px"; box.style.width = "98%";
             box.innerHTML = toolHtml + `<div class="max-h-[80vh] overflow-auto bg-slate-100 p-4">` + tableHtml + `</div>`;
             document.getElementById('modalOverlay').classList.remove('hidden');
             lucide.createIcons();
@@ -894,23 +948,9 @@
         window.openTagManager = () => {
             const box = document.getElementById('modalBox');
             box.style.maxWidth = "400px";
-            const tagsHtml = window.customTags.map((t, i) => `
-                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl mb-2 border">
-                    <div class="flex items-center gap-3"><div class="w-5 h-5 rounded shadow-sm" style="background-color: ${t.color}"></div><span class="font-black text-slate-700">${t.text}</span></div>
-                    <button onclick="window.deleteTag(${i})" class="text-rose-400 hover:text-rose-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                </div>`).join('');
+            const tagsHtml = window.customTags.map((t, i) => `<div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl mb-2 border"><div class="flex items-center gap-3"><div class="w-5 h-5 rounded shadow-sm" style="background-color: ${t.color}"></div><span class="font-black text-slate-700">${t.text}</span></div><button onclick="window.deleteTag(${i})" class="text-rose-400 hover:text-rose-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>`).join('');
             const colorsHtml = PRESET_COLORS.map(c => `<div onclick="window.selectTagColor('${c}', this)" class="tag-color-picker ${c === window.currentSelectedColor ? 'active' : ''}" style="background-color: ${c}"></div>`).join('');
-            box.innerHTML = `
-                <div class="bg-slate-800 p-4 flex items-center justify-between text-white"><div class="flex items-center gap-2"><i data-lucide="tags"></i><span class="font-black text-sm">標記管理</span></div><button onclick="window.renderAdminTools()"><i data-lucide="arrow-left"></i></button></div>
-                <div class="p-6 bg-white max-h-[500px] overflow-y-auto">
-                    <div class="mb-4">${tagsHtml || '<p class="text-center py-4 text-slate-300 font-bold">目前無自定義標記</p>'}</div>
-                    <div class="pt-4 border-t">
-                        <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">新增標記</label>
-                        <input type="text" id="newTagText" maxlength="4" placeholder="標記名稱 (如: 支援)" class="w-full bg-slate-50 border p-3 rounded-xl font-bold mb-3 outline-none text-sm focus:border-blue-500 transition-all">
-                        <div class="grid grid-cols-4 gap-3 mb-5">${colorsHtml}</div>
-                        <button onclick="window.addTag()" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-black shadow-lg hover:bg-slate-800 transition-all">新增標記工具</button>
-                    </div>
-                </div>`;
+            box.innerHTML = `<div class="bg-slate-800 p-4 flex items-center justify-between text-white"><div class="flex items-center gap-2"><i data-lucide="tags"></i><span class="font-black text-sm">標記管理</span></div><button onclick="window.renderAdminTools()"><i data-lucide="arrow-left"></i></button></div><div class="p-6 bg-white max-h-[500px] overflow-y-auto"><div class="mb-4">${tagsHtml || '<p class="text-center py-4 text-slate-300 font-bold">目前無自定義標記</p>'}</div><div class="pt-4 border-t"><label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block">新增標記</label><input type="text" id="newTagText" maxlength="4" placeholder="標記名稱 (如: 支援)" class="w-full bg-slate-50 border p-3 rounded-xl font-bold mb-3 outline-none text-sm focus:border-blue-500 transition-all"><div class="grid grid-cols-4 gap-3 mb-5">${colorsHtml}</div><button onclick="window.addTag()" class="w-full bg-slate-900 text-white py-3.5 rounded-xl font-black shadow-lg hover:bg-slate-800 transition-all">新增標記工具</button></div></div>`;
             lucide.createIcons();
         };
 
