@@ -161,13 +161,13 @@
             animation: ai-shimmer 2s infinite linear;
         }
 
-        /* 週期卡片樣式修正與列印 */
+        /* 週期卡片樣式修正與列印 - 修改寬度為 20% (5欄顯示) */
         .weekly-card {
-            width: calc(33.33% - 10px);
+            width: calc(20% - 10px);
             border: 2px solid #000;
             border-radius: 6px;
-            padding: 6px;
-            margin-bottom: 12px;
+            padding: 4px;
+            margin-bottom: 8px;
             page-break-inside: avoid;
             background: #fff;
             display: flex;
@@ -176,20 +176,20 @@
         }
         .weekly-card-header {
             border-bottom: 2px solid #000;
-            padding-bottom: 4px;
-            margin-bottom: 6px;
+            padding-bottom: 2px;
+            margin-bottom: 4px;
             text-align: center;
         }
         .weekly-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 10px;
+            font-size: 9px;
             table-layout: fixed;
         }
         .weekly-table th, .weekly-table td {
             border: 1.5px solid #000 !important;
-            height: 24px;
-            padding: 0px 2px !important;
+            height: 22px;
+            padding: 0px 1px !important;
             text-align: center;
             vertical-align: middle;
             color: black !important;
@@ -199,15 +199,15 @@
         .text-red-marker {
             color: #ff0000 !important;
             font-weight: 900 !important;
-            font-size: 13px !important;
+            font-size: 11px !important;
         }
         .weekly-footer {
-            margin-top: 6px;
-            font-size: 10px;
+            margin-top: 4px;
+            font-size: 9px;
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
             border-top: 1px solid #000;
-            padding-top: 4px;
+            padding-top: 2px;
             color: black;
         }
 
@@ -216,10 +216,10 @@
             body { padding: 0; background: white; margin: 0; }
             .modal-overlay { position: absolute; inset: 0; background: white; z-index: 99999; display: block; overflow: visible; }
             .modal-content { max-width: none; width: 100%; box-shadow: none; border-radius: 0; border: none; overflow: visible; }
-            .weekly-grid { display: flex !important; flex-wrap: wrap !important; gap: 8px !important; }
-            .weekly-card { width: calc(33.33% - 6px) !important; border: 2px solid black !important; }
+            .weekly-grid { display: flex !important; flex-wrap: wrap !important; gap: 6px !important; }
+            .weekly-card { width: calc(20% - 6px) !important; border: 2px solid black !important; }
             .text-red-marker { color: #ff0000 !important; -webkit-print-color-adjust: exact !important; }
-            @page { margin: 0.8cm; size: landscape; }
+            @page { margin: 0.5cm; size: landscape; }
         }
     </style>
 </head>
@@ -299,7 +299,7 @@
                         <div id="statusDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
                         <span id="statusLabel" class="text-[9px] font-black text-slate-400 uppercase">Connected</span>
                     </div>
-                    <span class="text-[8px] text-slate-300 font-bold uppercase tracking-widest">v6.1.PRO</span>
+                    <span class="text-[8px] text-slate-300 font-bold uppercase tracking-widest">v6.2.PRO</span>
                 </div>
                 <div class="flex justify-between items-center">
                     <span id="syncTime" class="text-[10px] font-bold text-slate-600 font-mono truncate">STANDBY</span>
@@ -534,7 +534,6 @@
                     for(let d=1; d<=days; d++) {
                         const ds = `${window.currentYear}-${String(window.currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                         let v = window.schedule[ds]?.[m] || "";
-                        // [計數更新] 新增 "排休" 判斷
                         const isCoreOff = (v === '休' || v === '排休' || v === '特' || v === '補');
                         if(isCoreOff) {
                             offCount++;
@@ -543,7 +542,6 @@
                         }
                         const customTag = window.customTags.find(t => t.text === v);
                         let cellStyle = customTag ? `background-color: ${customTag.color}` : "";
-                        // [視覺更新] 排休背景色採用 cell-off (紅色)
                         let cellClass = (v === '休' || v === '排休') ? 'cell-off' : (['特','補'].includes(v) ? 'bg-slate-500 text-white' : window.getTimeAreaClass(v));
                         if(customTag) cellClass = "cell-custom shadow-inner";
                         if (window.showOnlyOff && v && !isCoreOff) { v = ""; cellClass = ""; cellStyle = ""; }
@@ -679,7 +677,6 @@
             window.render();
         };
 
-        // [按鈕更新] 新增 "排休" 到常用工具列
         window.renderToolbar = () => {
             const core = [
                 { id: "CLEAR", label: "清", bg: "bg-slate-100 text-slate-400" },
@@ -792,15 +789,11 @@
             window.openPosMappingManager();
         };
 
-        // 修正輸出週期班表功能
         window.openWeeklyPrintSelector = () => {
             const box = document.getElementById('modalBox');
             box.style.maxWidth = "400px";
-            
-            // 生成當月第一天與最後一天作為預設值，避免時區偏移
             const firstDate = new Date(window.currentYear, window.currentMonth, 1);
             const lastDate = new Date(window.currentYear, window.currentMonth + 1, 0);
-            
             box.innerHTML = `
                 <div class="bg-slate-800 p-4 flex items-center justify-between text-white">
                     <div class="flex items-center gap-2 font-black text-sm uppercase">週期班表輸出</div>
@@ -829,7 +822,6 @@
             const endStr = document.getElementById('printEnd').value;
             if (!startStr || !endStr) return;
             
-            // 轉換為當地時間 Date 物件
             const startDateParts = startStr.split('-').map(Number);
             const endDateParts = endStr.split('-').map(Number);
             const start = new Date(startDateParts[0], startDateParts[1] - 1, startDateParts[2]);
@@ -837,7 +829,6 @@
             
             let cardsHtml = "";
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                // 使用 formatDateKey 確保查詢字串與儲存字串完全匹配
                 const ds = window.toDateKey(d);
                 const dayName = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"][d.getDay()];
                 const hData = window.HOLIDAY_DB[ds] || { n: "", r: false };
@@ -847,7 +838,6 @@
                 window.staffGroups.forEach(g => {
                     g.members.forEach(m => {
                         const shift = window.schedule[ds]?.[m] || "";
-                        // [計數更新] 新增 "排休" 判斷
                         if (['休', '排休', '特', '補'].includes(shift)) offList.push(m);
                         else if (shift) onDuty.push({ name: m, time: shift });
                     });
@@ -862,16 +852,16 @@
                     let posName = staff.name ? (window.posMapping[staff.name] || "待補") : "";
                     if(timeObj.startNum !== null) {
                         if(timeObj.startNum >= 800 && timeObj.startNum <= 1530) markerM = countM++;
-                        if(timeObj.startNum >= 1530 && timeObj.startNum <= 2100) markerA = countA++;
+                        if(timeObj.startNum >= 1430 && timeObj.startNum <= 2100) markerA = countA++;
                         if(timeObj.startNum >= 1730 && timeObj.startNum <= 2350) markerE = countE++;
                     }
-                    const markerStyle = 'style="color: #ff0000 !important; font-weight: 900 !important; font-size: 13px !important;"';
+                    const markerStyle = 'style="color: #ff0000 !important; font-weight: 900 !important; font-size: 11px !important;"';
                     rowHtml += `<tr><td contenteditable="true" style="font-family: monospace;">${timeObj.display === "--" ? "" : timeObj.display}</td><td contenteditable="true" style="font-weight:bold;">${staff.name}</td><td contenteditable="true">${posName}</td><td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerM}</td><td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerA}</td><td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerE}</td></tr>`;
                 }
-                cardsHtml += `<div class="weekly-card"><div class="weekly-card-header"><h2 class="text-[11px] font-black ${titleColor}">${d.getMonth()+1}/${d.getDate()} (${dayName}) <span class="text-rose-500 ml-1">${hData.n ? '['+hData.n+']' : ''}</span></h2></div><table class="weekly-table"><thead><tr class="bg-slate-50"><th style="width:70px">時間</th><th style="width:60px">人</th><th style="width:45px">崗位</th><th style="width:20px">早</th><th style="width:20px">中</th><th style="width:20px">晚</th></tr></thead><tbody>${rowHtml}</tbody></table><div class="weekly-footer"><div class="truncate w-2/3" contenteditable="true">休：<span class="font-bold">${offList.join('、') || '無'}</span></div><div class="text-right">發券：_______</div></div></div>`;
+                cardsHtml += `<div class="weekly-card"><div class="weekly-card-header"><h2 class="text-[10px] font-black ${titleColor}">${d.getMonth()+1}/${d.getDate()} (${dayName}) <span class="text-rose-500 ml-0.5">${hData.n ? '['+hData.n+']' : ''}</span></h2></div><table class="weekly-table"><thead><tr class="bg-slate-50"><th style="width:65px">時間</th><th style="width:55px">人</th><th style="width:40px">崗位</th><th style="width:18px">早</th><th style="width:18px">中</th><th style="width:18px">晚</th></tr></thead><tbody>${rowHtml}</tbody></table><div class="weekly-footer"><div class="truncate leading-tight" contenteditable="true">休：<span class="font-bold">${offList.join('、') || '無'}</span></div><div class="text-right mt-1">發券：_______</div></div></div>`;
             }
-            const box = document.getElementById('modalBox'); box.style.maxWidth = "1400px"; box.style.width = "98%";
-            box.innerHTML = `<div class="bg-slate-900 p-4 flex items-center justify-between text-white no-print"><div class="flex items-center gap-4"><button onclick="window.openWeeklyPrintSelector()" class="text-slate-400 hover:text-white"><i data-lucide="arrow-left"></i></button><span class="font-black text-sm uppercase">週期班表預覽 (可直接點擊表格修改)</span></div><button onclick="window.print()" class="bg-blue-600 px-6 py-2 rounded-lg font-black text-xs shadow-xl flex items-center gap-2"><i data-lucide="printer"></i> 列印 PDF / 紙本</button></div><div class="max-h-[85vh] overflow-auto bg-slate-100 p-4"><div class="print-preview-container"><div class="weekly-grid flex flex-wrap gap-[8px] justify-center">${cardsHtml}</div></div></div>`;
+            const box = document.getElementById('modalBox'); box.style.maxWidth = "1400px"; box.style.width = "99%";
+            box.innerHTML = `<div class="bg-slate-900 p-4 flex items-center justify-between text-white no-print"><div class="flex items-center gap-4"><button onclick="window.openWeeklyPrintSelector()" class="text-slate-400 hover:text-white"><i data-lucide="arrow-left"></i></button><span class="font-black text-sm uppercase">週期班表預覽 (5欄佈局)</span></div><button onclick="window.print()" class="bg-blue-600 px-6 py-2 rounded-lg font-black text-xs shadow-xl flex items-center gap-2"><i data-lucide="printer"></i> 列印 PDF / 紙本</button></div><div class="max-h-[85vh] overflow-auto bg-slate-100 p-4"><div class="print-preview-container"><div class="weekly-grid flex flex-wrap gap-[6px] justify-center">${cardsHtml}</div></div></div>`;
             lucide.createIcons();
         };
 
@@ -904,7 +894,6 @@
                         const v = window.schedule[ds]?.[m] || "";
                         const customTag = window.customTags.find(t => t.text === v);
                         let cellBg = "white"; let cellColor = "black";
-                        // [計數更新] 全月報表同步計入 "排休"
                         if (v === '休' || v === '排休') { cellBg = "#fb7185"; cellColor = "white"; offCount++; }
                         else if (['特','補'].includes(v)) { cellBg = "#64748b"; cellColor = "white"; offCount++; }
                         else if (customTag) { cellBg = customTag.color; cellColor = "white"; }
