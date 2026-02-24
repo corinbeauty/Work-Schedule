@@ -76,7 +76,6 @@
         };
         initAuth();
 
-        // 輔助函式：將 Date 物件轉為 YYYY-MM-DD
         window.toDateKey = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -150,7 +149,6 @@
         .admin-btn { width: 100%; padding: 12px; margin-bottom: 6px; border-radius: 12px; display: flex; align-items: center; gap: 10px; font-weight: 700; background: #f8fafc; border: 1px solid #f1f5f9; transition: all 0.2s; text-align: left; font-size: 0.75rem; }
         .admin-btn:hover { background: #f1f5f9; transform: translateY(-1px); }
 
-        /* AI 載入中動畫 */
         @keyframes ai-shimmer {
             0% { background-position: -200% 0; }
             100% { background-position: 200% 0; }
@@ -161,7 +159,6 @@
             animation: ai-shimmer 2s infinite linear;
         }
 
-        /* 週期卡片樣式修正與列印 - 修改寬度為 20% (5欄顯示) */
         .weekly-card {
             width: calc(20% - 10px);
             border: 2px solid #000;
@@ -230,7 +227,6 @@
         <h2 class="text-white text-lg font-black tracking-widest uppercase opacity-80">CONNECTED</h2>
     </div>
 
-    <!-- AI 載入進度條 -->
     <div id="aiLoadingIndicator" class="fixed top-0 left-0 w-full h-1 z-[20000] hidden">
         <div class="ai-loading-bar w-full h-full"></div>
     </div>
@@ -261,7 +257,6 @@
                 
                 <div class="w-px h-6 bg-slate-100 mx-1"></div>
                 
-                <!-- AI 智慧排班按鈕 -->
                 <button id="aiAutoFillBtn" onclick="window.aiAutoFill()" class="p-2 rounded-xl border border-blue-200 text-blue-500 hover:bg-blue-50 flex items-center gap-2 px-3 transition-all hidden group">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5 group-hover:animate-spin"></i>
                     <span class="text-[9px] font-black uppercase">AI 排班</span>
@@ -562,11 +557,30 @@
                 }
                 fHtml += r + `<td></td></tr>`;
             });
+
+            // --- 新增：店長同休驗證 (賴信吉、林詩涵) ---
+            let superRow = `<tr class="bg-slate-50/20 text-center"><td colspan="2" class="text-left pl-2 text-[7.5px] font-black text-slate-400 uppercase tracking-tighter">店長同休驗證</td>`;
+            for(let d=1; d<=days; d++) {
+                const ds = `${window.currentYear}-${String(window.currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                let count = 0;
+                // 檢查兩位主管
+                const boss1 = window.schedule[ds]?.["賴信吉"] || "";
+                const boss2 = window.schedule[ds]?.["林詩涵"] || "";
+                if(['休','排休','特','補'].includes(boss1)) count++;
+                if(['休','排休','特','補'].includes(boss2)) count++;
+                
+                if(count === 2) {
+                    superRow += `<td class="text-[9px] font-black text-center text-rose-500 animate-pulse">2</td>`;
+                } else {
+                    superRow += `<td class="text-[9px] font-black text-center text-slate-300"></td>`;
+                }
+            }
+            fHtml += superRow + `<td></td></tr>`;
+
             document.getElementById('tableFoot').innerHTML = fHtml;
             lucide.createIcons();
         };
 
-        // AI 智慧排班
         window.aiAutoFill = async () => {
             if (!window.isAdmin || window.isAiLoading) return;
             if (!confirm(`AI 將根據歷史紀錄自動「填補」 ${window.currentMonth + 1} 月的排班空白處。\n已填寫的內容（時間、休假、特休等）將會保留，是否繼續？`)) return;
@@ -584,16 +598,11 @@
                 const holidayInfo = JSON.stringify(window.HOLIDAY_DB);
                 const staffList = allStaff.join(', ');
 
-                const systemPrompt = `你是一位專業的飯店排班分析師。請根據提供的歷史排班紀錄（JSON格式），學習員工的排班規律（誰習慣休週幾、誰通常上什麼時段）。
-                重要規則：
-                1. 僅針對本月排班表中的「空白處」提供建議。
-                2. 如果某個員工在某天已經有資料（如 '休', '排休', '特', '補' 或特定時間），請「絕對不要更動」或「覆蓋」該內容。
-                3. 輸出的 JSON 格式必須為: {"YYYY-MM-DD": {"員工名": "建議班次", ...}, ...}
-                4. 只生成 ${currentMonthKey}-01 到 ${currentMonthKey}-${daysInMonth} 的日期。
-                5. 班次類型包含: '休', '排休', '0800-1530', '1630-1830', '1930-2350'。
-                6. 優先保證每個人的休假規律。
-                7. 嚴格遵守早班(1人休)、晚班(3人休)、夜班(1人休)的限制。
-                8. 僅回傳純 JSON 內容。`;
+                const systemPrompt = `你是一位專業的飯店排班分析師。請根據提供的歷史排班紀錄（JSON格式），學習員工的排班規律。
+                1. 僅針對空白處提供建議。
+                2. 不要覆蓋已有資料。
+                3. 輸出 JSON 格式: {"YYYY-MM-DD": {"員工名": "建議班次", ...}, ...}
+                4. 早班(1人休)、晚班(3人休)、夜班(1人休)限制。`;
 
                 const result = await window.callGemini(`歷史紀錄: ${historyData}\n當月節日: ${holidayInfo}\n員工名單: ${staffList}`, systemPrompt);
                 
@@ -861,7 +870,7 @@
                 cardsHtml += `<div class="weekly-card"><div class="weekly-card-header"><h2 class="text-[10px] font-black ${titleColor}">${d.getMonth()+1}/${d.getDate()} (${dayName}) <span class="text-rose-500 ml-0.5">${hData.n ? '['+hData.n+']' : ''}</span></h2></div><table class="weekly-table"><thead><tr class="bg-slate-50"><th style="width:65px">時間</th><th style="width:55px">人</th><th style="width:40px">崗位</th><th style="width:18px">早</th><th style="width:18px">中</th><th style="width:18px">晚</th></tr></thead><tbody>${rowHtml}</tbody></table><div class="weekly-footer"><div class="truncate leading-tight" contenteditable="true">休：<span class="font-bold">${offList.join('、') || '無'}</span></div><div class="text-right mt-1">發券：_______</div></div></div>`;
             }
             const box = document.getElementById('modalBox'); box.style.maxWidth = "1400px"; box.style.width = "99%";
-            box.innerHTML = `<div class="bg-slate-900 p-4 flex items-center justify-between text-white no-print"><div class="flex items-center gap-4"><button onclick="window.openWeeklyPrintSelector()" class="text-slate-400 hover:text-white"><i data-lucide="arrow-left"></i></button><span class="font-black text-sm uppercase">週期班表預覽 (5欄佈局)</span></div><button onclick="window.print()" class="bg-blue-600 px-6 py-2 rounded-lg font-black text-xs shadow-xl flex items-center gap-2"><i data-lucide="printer"></i> 列印 PDF / 紙本</button></div><div class="max-h-[85vh] overflow-auto bg-slate-100 p-4"><div class="print-preview-container"><div class="weekly-grid flex flex-wrap gap-[6px] justify-center">${cardsHtml}</div></div></div>`;
+            box.innerHTML = `<div class="bg-slate-900 p-4 flex items-center justify-between text-white no-print"><div class="flex items-center gap-4"><button onclick="window.openWeeklyPrintSelector()" class="text-slate-400 hover:text-white"><i data-lucide="arrow-left"></i></button><span class="font-black text-sm uppercase">週期班表預覽</span></div><button onclick="window.print()" class="bg-blue-600 px-6 py-2 rounded-lg font-black text-xs shadow-xl flex items-center gap-2"><i data-lucide="printer"></i> 列印 PDF / 紙本</button></div><div class="max-h-[85vh] overflow-auto bg-slate-100 p-4"><div class="print-preview-container"><div class="weekly-grid flex flex-wrap gap-[6px] justify-center">${cardsHtml}</div></div></div>`;
             lucide.createIcons();
         };
 
@@ -882,7 +891,6 @@
                 h2 += `<th style="font-size:10px; font-family: monospace; background-color:${headerBg} !important;">${d}</th>`;
             }
             tableHtml += `<thead>` + h0 + `<th rowspan="3" style="width:30px">休</th></tr>` + h1 + `</tr>` + h2 + `</tr></thead><tbody>`;
-            const dailyOffStats = { morning: {}, others: {}, night: {} };
             window.staffGroups.forEach((g) => {
                 const gType = g.group.substring(0,1);
                 g.members.forEach((m, mi) => {
@@ -894,16 +902,14 @@
                         const v = window.schedule[ds]?.[m] || "";
                         const customTag = window.customTags.find(t => t.text === v);
                         let cellBg = "white"; let cellColor = "black";
-                        if (v === '休' || v === '排休') { cellBg = "#fb7185"; cellColor = "white"; offCount++; }
-                        else if (['特','補'].includes(v)) { cellBg = "#64748b"; cellColor = "white"; offCount++; }
-                        else if (customTag) { cellBg = customTag.color; cellColor = "white"; }
-                        else if (v === "0800-1530") cellBg = "#dcfce7";
+                        if (v === '休' || v === '排休' || ['特','補'].includes(v)) { 
+                            cellBg = (v==='休'||v==='排休') ? "#fb7185" : "#64748b"; 
+                            cellColor = "white"; offCount++; 
+                        } else if (customTag) { 
+                            cellBg = customTag.color; cellColor = "white"; 
+                        } else if (v === "0800-1530") cellBg = "#dcfce7";
                         else if (v === "1630-1830") cellBg = "#fef9c3";
                         else if (v === "1930-2350") cellBg = "#dbeafe";
-                        if(['休','排休','特','補'].includes(v)) {
-                            const sk = gType === "早" ? "morning" : (gType === "夜" ? "night" : "others");
-                            dailyOffStats[sk][d] = (dailyOffStats[sk][d] || 0) + 1;
-                        }
                         tableHtml += `<td style="font-size:9px; font-weight:900; background-color:${cellBg} !important; color:${cellColor} !important;">${v}</td>`;
                     }
                     tableHtml += `<td style="font-weight:bold;">${offCount}</td></tr>`;
