@@ -34,12 +34,16 @@
         // 統一路徑輔助函式
         window.getRef = (c, id) => doc(db, 'artifacts', window.appId, 'public', 'data', c, id);
 
-        window.currentYear = 2026; window.currentMonth = 1; 
+        // V1 Modification: 自動初始化為當前月份
+        const now = new Date();
+        window.currentYear = now.getFullYear(); 
+        window.currentMonth = now.getMonth(); 
+        
         window.currentStore = "中清行館";
         window.isAdmin = false; window.schedule = {}; window.staffGroups = []; window.lockedMonths = {}; 
         window.selectedTool = "休"; window.requiredStaff = 14;
         window.showOnlyOff = false; window.customTags = []; 
-        window.posMapping = {}; // 崗位配對數據 { "人名": "崗位" }
+        window.posMapping = {}; 
         window.currentSelectedColor = "#1e293b";
         window.isAiLoading = false;
         
@@ -81,6 +85,35 @@
             const m = String(date.getMonth() + 1).padStart(2, '0');
             const d = String(date.getDate()).padStart(2, '0');
             return `${y}-${m}-${d}`;
+        };
+
+        // V1 Modification: 每月 10 號自動「強制更新」下個月人員名單與排序
+        window.checkAndRolloverPersonnel = async () => {
+            const today = new Date();
+            // 判斷邏輯：僅當目前顯示的月份是實際的「當前月份」時才執行自動同步，避免在查閱歷史資料時誤觸同步
+            const realYear = today.getFullYear();
+            const realMonth = today.getMonth();
+            if (window.currentYear !== realYear || window.currentMonth !== realMonth) return;
+            if (today.getDate() < 10) return; 
+
+            // 計算下個月
+            let nextYear = window.currentYear;
+            let nextMonth = window.currentMonth + 2; 
+            if (nextMonth > 12) { nextMonth = 1; nextYear++; }
+            const nextMKey = `${nextYear}-${nextMonth}`;
+            
+            const nextRef = window.getRef('personnel_config', `${nextMKey}_${window.currentStore}`);
+            
+            // 強制覆蓋下個月的名單
+            if (window.staffGroups.length > 0) {
+                console.log(`[System] Auto-Syncing personnel to ${nextMKey} (Forced)`);
+                await window.fbSetDoc(nextRef, { 
+                    staffGroups: window.staffGroups, 
+                    requiredStaffCount: window.requiredStaff 
+                });
+                const syncIndicator = document.getElementById('syncTime');
+                if(syncIndicator) syncIndicator.innerText = `${new Date().toLocaleTimeString()} NEXT-MO SYNCED`;
+            }
         };
     </script>
 
@@ -159,9 +192,8 @@
             animation: ai-shimmer 2s infinite linear;
         }
 
-        /* 調整卡片寬度為 33.33% 以實現一行 3 天 */
         .weekly-card {
-            width: calc(33.33% - 10px);
+            width: calc(20% - 10px);
             border: 2px solid #000;
             border-radius: 6px;
             padding: 4px;
@@ -215,7 +247,7 @@
             .modal-overlay { position: absolute; inset: 0; background: white; z-index: 99999; display: block; overflow: visible; }
             .modal-content { max-width: none; width: 100%; box-shadow: none; border-radius: 0; border: none; overflow: visible; }
             .weekly-grid { display: flex !important; flex-wrap: wrap !important; gap: 6px !important; }
-            .weekly-card { width: calc(33.33% - 6px) !important; border: 2px solid black !important; }
+            .weekly-card { width: calc(20% - 6px) !important; border: 2px solid black !important; }
             .text-red-marker { color: #ff0000 !important; -webkit-print-color-adjust: exact !important; }
             @page { margin: 0.5cm; size: landscape; }
         }
@@ -286,7 +318,7 @@
         <div class="mt-4 flex flex-col md:flex-row gap-4 items-stretch no-print">
             <div class="flex-1 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
                 <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2"><i data-lucide="message-square" class="w-3 h-3"></i> Store Notes</p>
-                <div id="footerNotes" class="text-slate-600 font-bold leading-relaxed whitespace-pre-line outline-none text-xs" contenteditable="false" onblur="window.saveFooter()">讀取中...</div>
+                <div id="footerNotes" class="text-slate-600 font-bold leading-relaxed whitespace-pre-line outline-none text-xs" contenteditable="true" onblur="window.saveFooter()">讀取中...</div>
             </div>
             
             <div id="adminStatusBar" class="md:w-56 bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-center transition-all">
@@ -392,6 +424,8 @@
                     window.staffGroups = s.data()?.staffGroups || []; 
                     window.requiredStaff = s.data()?.requiredStaffCount || 14;
                     window.render(); 
+                    // V1 Modification: 初始化讀取後立即判斷是否需強制更新下月
+                    window.checkAndRolloverPersonnel();
                 }
             }, errorFn);
 
@@ -549,7 +583,7 @@
             document.getElementById('tableBody').innerHTML = bHtml;
 
             let fHtml = "";
-            const statsCfg = [{ l: "早限制(1)", k: "morning", lim: 1 }, { l: "晚限制(3)", k: "others", lim: 3 }, { l: "夜限制(1)", k: "night", lim: 1 }];
+            const statsCfg = [{ l: "早限制(1)", k: "morning", lim: 1 }, { l: "晚限制(4)", k: "others", lim: 4 }, { l: "夜限制(1)", k: "night", lim: 1 }];
             statsCfg.forEach(s => {
                 let r = `<tr class="bg-slate-50/20 text-center"><td colspan="2" class="text-left pl-2 text-[7.5px] font-black text-slate-400 uppercase tracking-tighter">${s.l}</td>`;
                 for(let d=1; d<=days; d++) {
@@ -559,7 +593,7 @@
                 fHtml += r + `<td></td></tr>`;
             });
 
-            // --- 店長同休驗證 (賴信吉、林詩涵) ---
+            // 店長同休驗證
             let superRow = `<tr class="bg-slate-50/20 text-center"><td colspan="2" class="text-left pl-2 text-[7.5px] font-black text-slate-400 uppercase tracking-tighter">店長同休驗證</td>`;
             for(let d=1; d<=days; d++) {
                 const ds = `${window.currentYear}-${String(window.currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -583,7 +617,7 @@
 
         window.aiAutoFill = async () => {
             if (!window.isAdmin || window.isAiLoading) return;
-            if (!confirm(`AI 將根據歷史紀錄自動「填補」 ${window.currentMonth + 1} 月的排班空白處。\n已填寫的內容（時間、休假、特休等）將會保留，是否繼續？`)) return;
+            if (!confirm(`AI 將根據歷史紀錄自動「填補」 ${window.currentMonth + 1} 月的排班空白處。\n已填寫的內容將會保留，是否繼續？`)) return;
 
             window.isAiLoading = true;
             document.getElementById('aiLoadingIndicator').classList.remove('hidden');
@@ -592,17 +626,15 @@
             try {
                 const daysInMonth = new Date(window.currentYear, window.currentMonth + 1, 0).getDate();
                 const allStaff = window.staffGroups.flatMap(g => g.members);
-                const currentMonthKey = `${window.currentYear}-${String(window.currentMonth + 1).padStart(2, '0')}`;
-                
                 const historyData = JSON.stringify(window.schedule);
                 const holidayInfo = JSON.stringify(window.HOLIDAY_DB);
                 const staffList = allStaff.join(', ');
 
-                const systemPrompt = `你是一位專業的飯店排班分析師。請根據提供的歷史排班紀錄（JSON格式），學習員工的排班規律。
+                const systemPrompt = `你是一位專業的飯店排班分析師。
                 1. 僅針對空白處提供建議。
                 2. 不要覆蓋已有資料。
                 3. 輸出 JSON 格式: {"YYYY-MM-DD": {"員工名": "建議班次", ...}, ...}
-                4. 早班(1人休)、晚班(3人休)、夜班(1人休)限制。`;
+                4. 早班(1人休)、晚班(4人休)、夜班(1人休)限制。`;
 
                 const result = await window.callGemini(`歷史紀錄: ${historyData}\n當月節日: ${holidayInfo}\n員工名單: ${staffList}`, systemPrompt);
                 
@@ -619,11 +651,9 @@
                     });
                     await window.saveToFirebase();
                     window.render();
-                    alert(`AI 智慧填補已完成！`);
                 }
             } catch (err) {
                 console.error("AI Error:", err);
-                alert("AI 生成過程中發生錯誤。");
             } finally {
                 window.isAiLoading = false;
                 document.getElementById('aiLoadingIndicator').classList.add('hidden');
@@ -662,28 +692,43 @@
             const memberName = window.staffGroups[sourceGi].members[sourceMi];
             window.staffGroups[sourceGi].members.splice(sourceMi, 1);
             window.staffGroups[targetGi].members.splice(targetMi, 0, memberName);
-            window.dragSource = null; await window.saveStaff();
+            window.dragSource = null; 
+            await window.saveStaff(); // 此處會觸發強制同步
         };
 
         window.addStaff = async (gi) => {
             if(!window.isAdmin) return;
             const name = prompt("請輸入人員姓名：");
-            if (name && name.trim()) { window.staffGroups[gi].members.push(name.trim()); await window.saveStaff(); }
+            if (name && name.trim()) { 
+                window.staffGroups[gi].members.push(name.trim()); 
+                await window.saveStaff(); // 此處會觸發強制同步
+            }
         };
 
         window.delStaff = async (gi, mi, name) => {
             if(!window.isAdmin) return;
-            if (confirm(`確定移除 [${name}] 嗎？`)) { window.staffGroups[gi].members.splice(mi, 1); await window.saveStaff(); }
+            if (confirm(`確定移除 [${name}] 嗎？`)) { 
+                window.staffGroups[gi].members.splice(mi, 1); 
+                await window.saveStaff(); // 此處會觸發強制同步
+            }
         };
 
         window.adjReq = (delta) => { if(!window.isAdmin) return; window.updateRequired(window.requiredStaff + delta); };
-        window.updateRequired = async (val) => { window.requiredStaff = parseInt(val) || 0; await window.saveStaff(); };
+        window.updateRequired = async (val) => { 
+            window.requiredStaff = parseInt(val) || 0; 
+            await window.saveStaff(); // 此處會觸發強制同步
+        };
 
         window.saveStaff = async () => {
             if (!auth.currentUser) return;
             const mKey = `${window.currentYear}-${window.currentMonth + 1}`;
-            await window.fbSetDoc(window.getRef('personnel_config', `${mKey}_${window.currentStore}`), { staffGroups: window.staffGroups, requiredStaffCount: window.requiredStaff });
+            await window.fbSetDoc(window.getRef('personnel_config', `${mKey}_${window.currentStore}`), { 
+                staffGroups: window.staffGroups, 
+                requiredStaffCount: window.requiredStaff 
+            });
             window.render();
+            // V1 Modification: 每次儲存名單後同步執行下月強制更新判斷
+            window.checkAndRolloverPersonnel();
         };
 
         window.renderToolbar = () => {
@@ -719,7 +764,7 @@
                 <div class="p-8 text-center">
                     <div class="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-100"><i data-lucide="shield-check" class="w-7 h-7 text-slate-700"></i></div>
                     <h3 class="text-xl font-black text-slate-800 tracking-tight">管理者驗證</h3>
-                    <input type="password" id="pwdIn" class="w-full mt-6 bg-slate-50 border border-slate-200 rounded-xl py-5 text-center text-4xl font-black tracking-[0.4em] font-mono outline-none" onkeydown="if(event.key==='Enter') window.verify()">
+                    <input type="password" id="pwdIn" class="w-full mt-6 bg-slate-50 border border-slate-200 rounded-xl py-5 text-center text-4xl font-black tracking-[0.4em] outline-none" onkeydown="if(event.key==='Enter') window.verify()">
                     <div class="grid grid-cols-2 gap-3 mt-8"><button onclick="window.closeModal()" class="py-4 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition text-sm">取消</button><button onclick="window.verify()" class="bg-blue-600 text-white py-4 rounded-xl font-black shadow-lg text-sm">確認</button></div>
                 </div>`;
             document.getElementById('modalOverlay').classList.remove('hidden');
@@ -751,7 +796,6 @@
                     <button class="admin-btn" onclick="window.openPosMappingManager()"><i data-lucide="briefcase" class="w-5 h-5"></i> 崗位預設值配對設定</button>
                     <button class="admin-btn" onclick="window.openPrintPreview()"><i data-lucide="printer" class="w-5 h-5"></i> 輸出全月排班表</button>
                     <button class="admin-btn" onclick="window.openWeeklyPrintSelector()"><i data-lucide="calendar-days" class="w-5 h-5"></i> 輸出週期班表</button>
-                    <button class="admin-btn" onclick="window.forceImportMarch()"><i data-lucide="download-cloud" class="w-5 h-5"></i> 強制導入 3 月名單</button>
                     <div class="pt-4 border-t"><button onclick="window.logout()" class="text-rose-500 font-black text-xs uppercase w-full py-3 bg-rose-50 rounded-xl">Logout System</button></div>
                 </div>`;
             document.getElementById('modalOverlay').classList.remove('hidden'); lucide.createIcons();
@@ -854,53 +898,20 @@
                 
                 const titleColor = (hData.r || isWeekend) ? 'text-rose-600' : 'text-slate-800';
                 let rowHtml = ""; let countM = 1, countA = 1, countE = 1;
-                
-                for (let i = 0; i < 10; i++) {
+                for (let i = 0; i < 12; i++) {
                     const staff = onDuty[i] || { name: "", time: "" };
                     const timeObj = window.formatShiftTime(staff.time);
                     let markerM = "", markerA = "", markerE = "";
                     let posName = staff.name ? (window.posMapping[staff.name] || "待補") : "";
-                    
                     if(timeObj.startNum !== null) {
                         if(timeObj.startNum >= 800 && timeObj.startNum <= 1530) markerM = countM++;
                         if(timeObj.startNum >= 1430 && timeObj.startNum <= 2100) markerA = countA++;
                         if(timeObj.startNum >= 1730 && timeObj.startNum <= 2350) markerE = countE++;
                     }
-                    
                     const markerStyle = 'style="color: #ff0000 !important; font-weight: 900 !important; font-size: 11px !important;"';
-                    
-                    rowHtml += `<tr>
-                        <td contenteditable="true" style="font-family: monospace; font-size: 14px; font-weight: 900; white-space: nowrap;">${timeObj.display === "--" ? "" : timeObj.display}</td>
-                        <td contenteditable="true" style="font-size: 16px; font-weight: 900;">${staff.name}</td>
-                        <td contenteditable="true" style="font-size: 13px; font-weight: 900;">${posName}</td>
-                        <td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerM}</td>
-                        <td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerA}</td>
-                        <td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerE}</td>
-                    </tr>`;
+                    rowHtml += `<tr><td contenteditable="true" style="font-family: monospace;">${timeObj.display === "--" ? "" : timeObj.display}</td><td contenteditable="true" style="font-weight:bold;">${staff.name}</td><td contenteditable="true">${posName}</td><td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerM}</td><td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerA}</td><td contenteditable="true" class="text-red-marker" ${markerStyle}>${markerE}</td></tr>`;
                 }
-                cardsHtml += `
-                <div class="weekly-card">
-                    <div class="weekly-card-header">
-                        <h2 class="text-[10px] font-black ${titleColor}">${d.getMonth()+1}/${d.getDate()} (${dayName}) <span class="text-rose-500 ml-0.5">${hData.n ? '['+hData.n+']' : ''}</span></h2>
-                    </div>
-                    <table class="weekly-table">
-                        <thead>
-                            <tr class="bg-slate-50">
-                                <th style="width:70px">時間</th>
-                                <th style="width:50px">人</th>
-                                <th style="width:40px">崗位</th>
-                                <th style="width:18px">早</th>
-                                <th style="width:18px">中</th>
-                                <th style="width:18px">晚</th>
-                            </tr>
-                        </thead>
-                        <tbody>${rowHtml}</tbody>
-                    </table>
-                    <div class="weekly-footer">
-                        <div class="truncate leading-tight" contenteditable="true">休：<span class="font-bold">${offList.join('、') || '無'}</span></div>
-                        <div class="text-right mt-1">發券：_______</div>
-                    </div>
-                </div>`;
+                cardsHtml += `<div class="weekly-card"><div class="weekly-card-header"><h2 class="text-[10px] font-black ${titleColor}">${d.getMonth()+1}/${d.getDate()} (${dayName}) <span class="text-rose-500 ml-0.5">${hData.n ? '['+hData.n+']' : ''}</span></h2></div><table class="weekly-table"><thead><tr class="bg-slate-50"><th style="width:65px">時間</th><th style="width:55px">人</th><th style="width:40px">崗位</th><th style="width:18px">早</th><th style="width:18px">中</th><th style="width:18px">晚</th></tr></thead><tbody>${rowHtml}</tbody></table><div class="weekly-footer"><div class="truncate leading-tight" contenteditable="true">休：<span class="font-bold">${offList.join('、') || '無'}</span></div><div class="text-right mt-1">發券：_______</div></div></div>`;
             }
             const box = document.getElementById('modalBox'); box.style.maxWidth = "1400px"; box.style.width = "99%";
             box.innerHTML = `<div class="bg-slate-900 p-4 flex items-center justify-between text-white no-print"><div class="flex items-center gap-4"><button onclick="window.openWeeklyPrintSelector()" class="text-slate-400 hover:text-white"><i data-lucide="arrow-left"></i></button><span class="font-black text-sm uppercase">週期班表預覽</span></div><button onclick="window.print()" class="bg-blue-600 px-6 py-2 rounded-lg font-black text-xs shadow-xl flex items-center gap-2"><i data-lucide="printer"></i> 列印 PDF / 紙本</button></div><div class="max-h-[85vh] overflow-auto bg-slate-100 p-4"><div class="print-preview-container"><div class="weekly-grid flex flex-wrap gap-[6px] justify-center">${cardsHtml}</div></div></div>`;
@@ -962,17 +973,6 @@
             await window.saveHolidays();
         };
 
-        window.forceImportMarch = async () => {
-            if (!confirm("確定要導入 3 月份的名單嗎？")) return;
-            const marchRef = window.getRef('personnel_config', `2026-3_${window.currentStore}`);
-            const marchSnap = await window.fbGetDoc(marchRef);
-            if (marchSnap.exists()) {
-                window.staffGroups = marchSnap.data().staffGroups;
-                window.requiredStaff = marchSnap.data().requiredStaffCount;
-                await window.saveStaff(); alert("導入完成！"); window.closeModal();
-            }
-        };
-
         window.openTagManager = () => {
             const box = document.getElementById('modalBox');
             box.style.maxWidth = "400px";
@@ -1000,6 +1000,7 @@
             document.getElementById('modalOverlay').classList.add('hidden');
         };
         window.changeMonth = async (v) => { window.currentMonth += v; if(window.currentMonth>11){window.currentMonth=0;window.currentYear++;} if(window.currentMonth<0){window.currentMonth=11;window.currentYear--;} window.render(); await window.loadData(); };
+        
         window.saveFooter = async () => {
             if (!auth.currentUser) return;
             await window.fbSetDoc(window.getRef('footer_notes', `current_${window.currentStore}`), { text: document.getElementById('footerNotes').innerText });
