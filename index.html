@@ -9,7 +9,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeFirestore, doc, setDoc, getDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const PASS_MASTER = "1016"; 
         const firebaseConfig = {
@@ -23,7 +23,8 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
+        // Force long-polling to solve "Could not reach Cloud Firestore backend" in sandboxed environments
+        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
         const PATH_APP = "shou-wu-zu-dao-main";
 
         window.db = db; window.auth = auth; window.appId = PATH_APP; window.PASS_MASTER = PASS_MASTER;
@@ -67,7 +68,6 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
-        /* 精確縮減寬度以利於一頁顯示 */
         :root { --col-name: 90px; --col-shift: 34px; --col-day: 28px; }
         * { box-sizing: border-box; }
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8fafc; color: #0f172a; font-size: 0.65rem; }
@@ -206,7 +206,7 @@
                         <div id="statusDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
                         <span id="statusLabel" class="text-[9px] font-black text-slate-400 uppercase">Connected</span>
                     </div>
-                    <span class="text-[8px] text-slate-300 font-bold uppercase tracking-widest">v7.4.PRO</span>
+                    <span class="text-[8px] text-slate-300 font-bold uppercase tracking-widest">v7.5.PRO</span>
                 </div>
                 <div class="flex justify-between items-center">
                     <span id="syncTime" class="text-[10px] font-bold text-slate-600 font-mono truncate">STANDBY</span>
@@ -430,7 +430,6 @@
             colHtml += `<col style="width: 35px;">`;
             document.getElementById('mainColgroup').innerHTML = colHtml;
 
-            // 計算現有人數：只算未隱藏的人員
             const totalStaff = window.staffGroups.reduce((acc, g) => {
                 const visible = g.members.filter(m => !(g.hiddenMembers || []).includes(m));
                 return acc + visible.length;
@@ -476,7 +475,6 @@
             window.staffGroups.forEach((g, gi) => {
                 const gType = g.group.substring(0,1);
                 const hiddenList = g.hiddenMembers || [];
-                // 重要：先過濾出目前可見的人員，避免 rowspan 計算錯誤
                 const visibleMembers = g.members.filter(m => !hiddenList.includes(m));
 
                 visibleMembers.forEach((m, mi) => {
@@ -486,21 +484,24 @@
                             <div class="flex items-center justify-center relative group w-full h-full">
                                 <span class="truncate px-1">${m}</span>
                                 ${window.isAdmin ? `
-                                <div class="staff-action-btn absolute right-0 flex items-center gap-0.5 no-print">
+                                <div class="staff-action-btn absolute right-0 flex items-center gap-0.5 no-print pr-1">
+                                    <div class="flex flex-col gap-0.5">
+                                        <button onclick="window.moveStaff(${gi}, ${mi}, -1)" title="上移" class="p-0.5 text-slate-400 bg-white/80 rounded hover:text-blue-500"><i data-lucide="chevron-up" class="w-2.5 h-2.5"></i></button>
+                                        <button onclick="window.moveStaff(${gi}, ${mi}, 1)" title="下移" class="p-0.5 text-slate-400 bg-white/80 rounded hover:text-blue-500"><i data-lucide="chevron-down" class="w-2.5 h-2.5"></i></button>
+                                    </div>
                                     <button onclick="window.renameStaff(${gi}, ${mi})" title="重新命名" class="p-0.5 text-blue-400 bg-white/80 rounded shadow-sm"><i data-lucide="edit-2" class="w-2.5 h-2.5"></i></button>
                                     <button onclick="window.removeStaff(${gi}, ${mi})" title="隱藏人員" class="p-0.5 text-rose-400 bg-white/80 rounded shadow-sm"><i data-lucide="eye-off" class="w-2.5 h-2.5"></i></button>
                                 </div>` : ''}
                             </div>
                         </td>`;
                     
-                    // 修正點：rowspan 僅基於可見人員數量
                     if(mi === 0) row += `<td rowspan="${visibleMembers.length}" class="frame-a-shift text-[10px] text-slate-400 font-black">
                         ${gType}${window.isAdmin ? `<button onclick="window.addStaff(${gi})" class="block w-full text-blue-400 mt-1 no-print"><i data-lucide="plus-circle" class="w-4 h-4 mx-auto"></i></button>` : ''}
                     </td>`;
                     
                     for(let d=1; d<=days; d++) {
                         const ds = window.toDateKey(new Date(window.currentYear, window.currentMonth, d));
-                        let v = window.schedule[ds]?.[m.trim()] || ""; // 使用 trim() 確保比對精確
+                        let v = window.schedule[ds]?.[m.trim()] || ""; 
                         const isCoreOff = (v === '休' || v === '排休' || v === '特' || v === '補');
                         if(isCoreOff) offCount++;
                         
@@ -523,7 +524,6 @@
             });
             document.getElementById('tableBody').innerHTML = bHtml;
 
-            // Footer 統計邏輯
             let f早 = `<tr><td class="frame-b-name bg-slate-50 text-[9px] text-amber-600 px-2 font-black">早(1)</td><td class="frame-a-shift bg-slate-50"></td>`;
             let f中晚 = `<tr><td class="frame-b-name bg-slate-50 text-[9px] text-emerald-600 px-2 font-black">中晚(3)</td><td class="frame-a-shift bg-slate-50"></td>`;
             let f夜 = `<tr><td class="frame-b-name bg-slate-50 text-[9px] text-indigo-600 px-2 font-black">夜(1)</td><td class="frame-a-shift bg-slate-50"></td>`;
@@ -551,27 +551,33 @@
                 f中晚 += `<td class="border-r border-b ${check(c中晚, 3)}">${c中晚}</td>`;
                 f夜 += `<td class="border-r border-b ${check(c夜, 1)}">${c夜}</td>`;
             }
-            // 修正點：Footer 的最後一格「休」累計列需加上空 cell 對齊
             document.getElementById('tableFoot').innerHTML = f早 + `<td class="bg-slate-50 border-b border-l-2"></td></tr>` + f中晚 + `<td class="bg-slate-50 border-b border-l-2"></td></tr>` + f夜 + `<td class="bg-slate-50 border-b border-l-2"></td></tr>`;
 
             lucide.createIcons();
         };
 
-        window.hDragStart = (gi, mi) => { window.draggedMember = { gi, mi }; };
-        window.hDrop = async (gi, mi) => {
-            if(!window.draggedMember) return;
-            const { gi: fgi, mi: fmi } = window.draggedMember;
-            const member = window.staffGroups[fgi].members.splice(fmi, 1)[0];
-            window.staffGroups[gi].members.splice(mi, 0, member);
-            window.draggedMember = null;
-            await window.savePersonnel(); window.render();
+        window.moveStaff = async (gi, mi, dir) => {
+            const hiddenList = window.staffGroups[gi].hiddenMembers || [];
+            const visibleMembers = window.staffGroups[gi].members.filter(m => !hiddenList.includes(m));
+            const currentName = visibleMembers[mi];
+            const targetIndexInVisible = mi + dir;
+            if (targetIndexInVisible < 0 || targetIndexInVisible >= visibleMembers.length) return;
+            const targetName = visibleMembers[targetIndexInVisible];
+            const idx1 = window.staffGroups[gi].members.indexOf(currentName);
+            const idx2 = window.staffGroups[gi].members.indexOf(targetName);
+            if (idx1 !== -1 && idx2 !== -1) {
+                const temp = window.staffGroups[gi].members[idx1];
+                window.staffGroups[gi].members[idx1] = window.staffGroups[gi].members[idx2];
+                window.staffGroups[gi].members[idx2] = temp;
+                await window.savePersonnel();
+                window.render();
+            }
         };
 
         window.addStaff = async (gi) => {
             const name = prompt("請輸入員工姓名:");
             if(!name) return;
             const group = window.staffGroups[gi];
-            // 若該員在隱藏名單，則恢復顯示，不新增重複名單
             if (group.hiddenMembers && group.hiddenMembers.includes(name)) {
                 group.hiddenMembers = group.hiddenMembers.filter(n => n !== name);
             } else if (!group.members.includes(name)) {
@@ -583,9 +589,10 @@
             await window.savePersonnel(); window.render();
         };
 
-        // 隱藏邏輯：不刪除數組內容，僅標記隱藏
         window.removeStaff = async (gi, mi) => {
-            const name = window.staffGroups[gi].members[mi];
+            const hiddenList = window.staffGroups[gi].hiddenMembers || [];
+            const visibleMembers = window.staffGroups[gi].members.filter(m => !hiddenList.includes(m));
+            const name = visibleMembers[mi];
             if(confirm(`確定隱藏員工「${name}」嗎？\n(隱藏後資料仍會保留在資料庫，可隨時復原)`)) {
                 if(!window.staffGroups[gi].hiddenMembers) window.staffGroups[gi].hiddenMembers = [];
                 if(!window.staffGroups[gi].hiddenMembers.includes(name)) {
@@ -596,10 +603,13 @@
         };
 
         window.renameStaff = async (gi, mi) => {
-            const oldName = window.staffGroups[gi].members[mi];
+            const hiddenList = window.staffGroups[gi].hiddenMembers || [];
+            const visibleMembers = window.staffGroups[gi].members.filter(m => !hiddenList.includes(m));
+            const oldName = visibleMembers[mi];
+            const actualIdx = window.staffGroups[gi].members.indexOf(oldName);
             const newName = prompt("更換姓名 (將同步更新所有歷史紀錄):", oldName);
             if(newName && newName !== oldName) {
-                window.staffGroups[gi].members[mi] = newName;
+                window.staffGroups[gi].members[actualIdx] = newName;
                 Object.keys(window.schedule).forEach(date => {
                     if(window.schedule[date] && window.schedule[date][oldName]) {
                         window.schedule[date][newName] = window.schedule[date][oldName];
@@ -610,7 +620,6 @@
             }
         };
 
-        // 管理者工具介面
         window.renderAdminTools = () => {
             const box = document.getElementById('modalBox'); box.style.maxWidth = "450px";
             box.innerHTML = `
@@ -637,7 +646,7 @@
                     listHtml += `
                         <div class="flex items-center justify-between p-3 bg-slate-50 border rounded-xl mb-2">
                             <div class="flex flex-col"><span class="text-[10px] text-slate-400 font-black">${g.group}</span><span class="font-bold">${m}</span></div>
-                            <button onclick="window.restoreStaff(${gi}, ${hi})" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-black text-[10px] flex items-center gap-1"><i data-lucide="eye"></i> 復原</button>
+                            <button onclick="window.restoreStaff(${gi}, ${hi})" class="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-black text-[10px] flex items-center gap-1"><i data-lucide="eye" class="w-3 h-3"></i> 復原</button>
                         </div>`;
                 });
             });
@@ -663,7 +672,7 @@
                     <div class="flex items-center gap-2"><div class="w-4 h-4 rounded" style="background-color: ${t.color}"></div><span class="font-bold text-slate-700">${t.text}</span></div>
                     <button onclick="window.deleteTag(${i})" class="text-rose-400 hover:text-rose-600"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                 </div>`).join('');
-            const colorsHtml = PRESET_COLORS.map(c => `<div onclick="window.selectTagColor('${c}', this)" class="tag-color-picker ${c === window.currentSelectedColor ? 'active' : ''}" style="background-color: ${c}"></div>`).join('');
+            const colorsHtml = PRESET_COLORS.map(c => `<div onclick="window.selectTagColor('${c}', this)" class="w-6 h-6 rounded-full cursor-pointer border-2 border-transparent hover:scale-110 transition ${c === window.currentSelectedColor ? '!border-slate-900 scale-110' : ''}" style="background-color: ${c}"></div>`).join('');
             box.innerHTML = `
                 <div class="bg-slate-800 p-4 flex items-center justify-between text-white"><div class="font-black text-sm">標記管理</div><button onclick="window.renderAdminTools()"><i data-lucide="arrow-left"></i></button></div>
                 <div class="p-6 bg-white space-y-4">
@@ -686,7 +695,7 @@
             if (!auth.currentUser) return; window.customTags.splice(idx, 1);
             await window.fbSetDoc(window.getRef('custom_tags', 'current'), { tags: window.customTags }); window.openTagManager();
         };
-        window.selectTagColor = (c, el) => { window.currentSelectedColor = c; document.querySelectorAll('.tag-color-picker').forEach(p => p.classList.remove('active')); el.classList.add('active'); };
+        window.selectTagColor = (c, el) => { window.currentSelectedColor = c; window.openTagManager(); };
 
         window.openPosMappingManager = () => {
             const box = document.getElementById('modalBox'); box.style.maxWidth = "450px";
@@ -756,12 +765,10 @@
             if (!startStr || !endStr) return;
             const start = new Date(startStr); const end = new Date(endStr);
             let cardsHtml = "";
-            
             const getGroupNameOfMember = (name) => {
                 const grpObj = window.staffGroups.find(g => g.members.includes(name));
                 return grpObj ? grpObj.group : "";
             };
-
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
                 const ds = window.toDateKey(d);
                 const dayName = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"][d.getDay()];
@@ -778,7 +785,6 @@
                         else if (shift) onDutyRaw.push({ name: m, time: shift });
                     });
                 });
-
                 let groupedOnDuty = [];
                 let i = 0;
                 while(i < onDutyRaw.length) {
@@ -786,7 +792,6 @@
                     const next = onDutyRaw[i+1];
                     const curGrp = getGroupNameOfMember(current.name);
                     const isSpecialGroup = curGrp.includes("鯰魚") || curGrp.includes("野雁");
-
                     if (isSpecialGroup && next && current.time === next.time && curGrp === getGroupNameOfMember(next.name)) {
                         groupedOnDuty.push({ names: [current.name, next.name], time: current.time });
                         i += 2;
@@ -795,10 +800,8 @@
                         i++;
                     }
                 }
-
                 const titleColor = (hData.r || isWeekend) ? 'text-rose-600' : 'text-slate-800';
                 let rowHtml = ""; let cM=1, cA=1, cE=1;
-                
                 for (let j = 0; j < 10; j++) { 
                     const staffSet = groupedOnDuty[j] || { names: [""], time: "" };
                     const timeObj = window.formatShiftTime(staffSet.time);
@@ -810,7 +813,6 @@
                             if(timeObj.startNum >= 1730 && timeObj.startNum <= 2350) mE = `<span class="text-red-marker">${cE++}</span>`;
                         }
                     });
-
                     rowHtml += `<tr>
                         <td contenteditable="true" style="font-family: monospace;">${timeObj.display==="--"?"":timeObj.display}</td>
                         <td contenteditable="true" style="font-weight:bold;">${staffSet.names.filter(n=>n).join('、')}</td>
