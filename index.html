@@ -305,7 +305,11 @@
 
         window.loadData = async () => {
             if (!auth.currentUser) return;
-            const mKey = `${window.currentYear}-${window.currentMonth + 1}`;
+            
+            // 擷取當下要加載的年月，避免非同步或快速切換導致的跨年對應錯誤
+            const mYear = window.currentYear;
+            const mMonth = window.currentMonth;
+            const mKey = `${mYear}-${mMonth + 1}`;
             const errorFn = (err) => console.error("Firebase Error:", err);
 
             if (window.unsubs) { window.unsubs.forEach(un => un()); window.unsubs = []; }
@@ -321,18 +325,23 @@
                     window.requiredStaff = s.data()?.requiredStaffCount || 14; 
                     window.render(); 
                 } else {
-                    // Auto-carry over staff from previous month
-                    let pMonth = window.currentMonth - 1;
-                    let pYear = window.currentYear;
-                    if (pMonth < 0) { pMonth = 11; pYear--; }
-                    const pKey = `${pYear}-${pMonth + 1}`;
+                    // 自動繼承上個月的員工設定 (安全的跨年回推演算法)
+                    const prevDate = new Date(mYear, mMonth - 1, 1);
+                    const pKey = `${prevDate.getFullYear()}-${prevDate.getMonth() + 1}`;
                     
                     try {
                         const prevDoc = await window.fbGetDoc(window.getRef('personnel_config', `${pKey}_${window.currentStore}`));
                         if (prevDoc.exists()) {
                             window.staffGroups = prevDoc.data()?.staffGroups || [];
                             window.requiredStaff = prevDoc.data()?.requiredStaffCount || 14;
-                            await window.savePersonnel(); // Save immediately for this month
+                            
+                            // 直接寫入目前確保對應到的目標月份，不依賴全域變數，防止快速切頁干擾
+                            if (auth.currentUser) {
+                                await window.fbSetDoc(window.getRef('personnel_config', `${mKey}_${window.currentStore}`), { 
+                                    staffGroups: window.staffGroups, 
+                                    requiredStaffCount: window.requiredStaff 
+                                });
+                            }
                         } else {
                             window.staffGroups = [];
                         }
