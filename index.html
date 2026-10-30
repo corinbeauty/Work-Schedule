@@ -306,7 +306,6 @@
         window.loadData = async () => {
             if (!auth.currentUser) return;
             
-            // 擷取當下要加載的年月，避免非同步或快速切換導致的跨年對應錯誤
             const mYear = window.currentYear;
             const mMonth = window.currentMonth;
             const mKey = `${mYear}-${mMonth + 1}`;
@@ -319,37 +318,14 @@
             }, errorFn);
             window.unsubs.push(unsubSchedule);
 
-            const unsubPersonnel = window.onSnapshot(window.getRef('personnel_config', `${mKey}_${window.currentStore}`), async s => { 
+            const unsubPersonnel = window.onSnapshot(window.getRef('personnel_config', `${mKey}_${window.currentStore}`), s => { 
                 if(s.exists()){ 
                     window.staffGroups = s.data()?.staffGroups || []; 
                     window.requiredStaff = s.data()?.requiredStaffCount || 14; 
-                    window.render(); 
                 } else {
-                    // 自動繼承上個月的員工設定 (安全的跨年回推演算法)
-                    const prevDate = new Date(mYear, mMonth - 1, 1);
-                    const pKey = `${prevDate.getFullYear()}-${prevDate.getMonth() + 1}`;
-                    
-                    try {
-                        const prevDoc = await window.fbGetDoc(window.getRef('personnel_config', `${pKey}_${window.currentStore}`));
-                        if (prevDoc.exists()) {
-                            window.staffGroups = prevDoc.data()?.staffGroups || [];
-                            window.requiredStaff = prevDoc.data()?.requiredStaffCount || 14;
-                            
-                            // 直接寫入目前確保對應到的目標月份，不依賴全域變數，防止快速切頁干擾
-                            if (auth.currentUser) {
-                                await window.fbSetDoc(window.getRef('personnel_config', `${mKey}_${window.currentStore}`), { 
-                                    staffGroups: window.staffGroups, 
-                                    requiredStaffCount: window.requiredStaff 
-                                });
-                            }
-                        } else {
-                            window.staffGroups = [];
-                        }
-                    } catch(e) {
-                        window.staffGroups = [];
-                    }
-                    window.render();
+                    window.staffGroups = [];
                 }
+                window.render();
             }, errorFn);
             window.unsubs.push(unsubPersonnel);
 
@@ -689,11 +665,45 @@
             }
         };
 
+        window.promptCopyPrevMonth = async () => {
+            const pwd = prompt("請輸入操作密碼 (避免誤觸):");
+            if (pwd !== "8888") {
+                if (pwd !== null) alert("密碼錯誤！");
+                return;
+            }
+            
+            let pYear = window.currentYear;
+            let pMonth = window.currentMonth - 1;
+            if (pMonth < 0) {
+                pMonth = 11;
+                pYear--;
+            }
+            const pKey = `${pYear}-${pMonth + 1}`;
+            
+            try {
+                const prevDoc = await window.fbGetDoc(window.getRef('personnel_config', `${pKey}_${window.currentStore}`));
+                if (prevDoc.exists()) {
+                    window.staffGroups = prevDoc.data()?.staffGroups || [];
+                    window.requiredStaff = prevDoc.data()?.requiredStaffCount || 14;
+                    await window.savePersonnel();
+                    window.render();
+                    alert("✅ 成功複製上個月的人員名單！");
+                    window.closeModal();
+                } else {
+                    alert("上個月沒有人員名單紀錄。");
+                }
+            } catch (e) {
+                console.error("Copy failed", e);
+                alert("讀取失敗，請檢查網路連線。");
+            }
+        };
+
         window.renderAdminTools = () => {
             const box = document.getElementById('modalBox'); box.style.maxWidth = "450px";
             box.innerHTML = `
                 <div class="bg-slate-900 p-4 flex items-center justify-between text-white"><div class="text-xs font-black uppercase">Admin Console</div><button onclick="window.closeModal()"><i data-lucide="x" class="w-5 h-5"></i></button></div>
                 <div class="p-6 bg-white flex flex-col gap-1">
+                    <button class="admin-btn" onclick="window.promptCopyPrevMonth()"><i data-lucide="copy" class="text-purple-500"></i> 複製上月人員名單</button>
                     <button class="admin-btn" onclick="window.openTagManager()"><i data-lucide="tags" class="text-blue-500"></i> 標記工具管理</button>
                     <button class="admin-btn" onclick="window.openPosMappingManager()"><i data-lucide="briefcase" class="text-emerald-500"></i> 崗位預設值配對設定</button>
                     <button class="admin-btn" onclick="window.openHiddenManager()"><i data-lucide="eye" class="text-amber-500"></i> 隱藏人員管理 (復原)</button>
