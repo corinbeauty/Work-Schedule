@@ -221,8 +221,92 @@
         <div id="modalBox" class="modal-content" onclick="event.stopPropagation()"></div>
     </div>
 
+    <!-- 自定義系統對話框 (新增) -->
+    <div id="dialogOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[10005] hidden flex items-center justify-center opacity-0 transition-all duration-200">
+        <div id="dialogBox" class="bg-white w-11/12 max-w-sm rounded-2xl shadow-2xl p-6 transform scale-95 transition-all duration-200"></div>
+    </div>
+
     <script>
         const PRESET_COLORS = ["#1e293b", "#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#64748b"];
+
+        // 新增：系統級自定義對話框控制器
+        window.showDialog = (contentHTML, onReady) => {
+            return new Promise(resolve => {
+                const overlay = document.getElementById('dialogOverlay');
+                const box = document.getElementById('dialogBox');
+                box.innerHTML = contentHTML;
+                overlay.classList.remove('hidden');
+                void overlay.offsetWidth; // 觸發重繪以播放動畫
+                overlay.classList.remove('opacity-0');
+                box.classList.remove('scale-95');
+                if(window.lucide) lucide.createIcons();
+
+                const close = (val) => {
+                    overlay.classList.add('opacity-0');
+                    box.classList.add('scale-95');
+                    setTimeout(() => {
+                        overlay.classList.add('hidden');
+                        resolve(val);
+                    }, 200);
+                };
+                if (onReady) onReady(close);
+            });
+        };
+
+        window.customAlert = (message, type = 'info') => {
+            let icon = type === 'error' ? '<i data-lucide="alert-circle" class="text-rose-500 w-12 h-12 mx-auto mb-4"></i>' :
+                       (type === 'success' ? '<i data-lucide="check-circle-2" class="text-emerald-500 w-12 h-12 mx-auto mb-4"></i>' :
+                       '<i data-lucide="info" class="text-blue-500 w-12 h-12 mx-auto mb-4"></i>');
+            return window.showDialog(`
+                <div class="text-center pb-2">
+                    ${icon}
+                    <h3 class="text-base font-black text-slate-800 mb-6 whitespace-pre-line leading-relaxed">${message}</h3>
+                    <button id="diaBtn" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl hover:bg-slate-800 shadow-lg transition-transform active:scale-95">確定</button>
+                </div>
+            `, (close) => {
+                const btn = document.getElementById('diaBtn');
+                btn.onclick = () => close();
+                btn.focus();
+            });
+        };
+
+        window.customConfirm = (message) => {
+            return window.showDialog(`
+                <div class="text-center pb-2">
+                    <i data-lucide="help-circle" class="text-amber-500 w-12 h-12 mx-auto mb-4"></i>
+                    <h3 class="text-base font-black text-slate-800 mb-6 whitespace-pre-line leading-relaxed">${message}</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="diaBtnCancel" class="w-full bg-slate-100 text-slate-500 font-bold py-3.5 rounded-xl hover:bg-slate-200 transition-colors">取消</button>
+                        <button id="diaBtnOk" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl hover:bg-slate-800 shadow-lg transition-transform active:scale-95">確定</button>
+                    </div>
+                </div>
+            `, (close) => {
+                document.getElementById('diaBtnCancel').onclick = () => close(false);
+                const okBtn = document.getElementById('diaBtnOk');
+                okBtn.onclick = () => close(true);
+                okBtn.focus();
+            });
+        };
+
+        window.customPrompt = (message, defaultVal = "", type = "text") => {
+            return window.showDialog(`
+                <div class="text-center pb-2">
+                    <h3 class="text-base font-black text-slate-800 mb-4 whitespace-pre-line leading-relaxed">${message}</h3>
+                    <input type="${type}" id="diaInput" value="${defaultVal}" class="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 mb-6 text-center font-bold outline-none focus:border-blue-500 focus:bg-white transition-all text-lg" autocomplete="off">
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="diaBtnCancel" class="w-full bg-slate-100 text-slate-500 font-bold py-3.5 rounded-xl hover:bg-slate-200 transition-colors">取消</button>
+                        <button id="diaBtnOk" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl hover:bg-slate-800 shadow-lg transition-transform active:scale-95">確認</button>
+                    </div>
+                </div>
+            `, (close) => {
+                const input = document.getElementById('diaInput');
+                const submit = () => close(input.value);
+                document.getElementById('diaBtnCancel').onclick = () => close(null);
+                document.getElementById('diaBtnOk').onclick = submit;
+                input.onkeydown = (e) => { if(e.key === 'Enter') submit(); };
+                setTimeout(() => { input.focus(); input.select(); }, 50);
+            });
+        };
 
         window.getTimeAreaClass = (val) => {
             if (val === "0800-1530") return "time-area-green";
@@ -620,7 +704,7 @@
         };
 
         window.addStaff = async (gi) => {
-            const name = prompt("請輸入員工姓名:");
+            const name = await window.customPrompt("請輸入員工姓名:");
             if(!name) return;
             const group = window.staffGroups[gi];
             if (group.hiddenMembers && group.hiddenMembers.includes(name)) {
@@ -628,7 +712,7 @@
             } else if (!group.members.includes(name)) {
                 group.members.push(name);
             } else {
-                alert("該人員已在目前名單中");
+                await window.customAlert("該人員已在目前名單中", "error");
                 return;
             }
             await window.savePersonnel(); window.render();
@@ -638,7 +722,8 @@
             const hiddenList = window.staffGroups[gi].hiddenMembers || [];
             const visibleMembers = window.staffGroups[gi].members.filter(m => !hiddenList.includes(m));
             const name = visibleMembers[mi];
-            if(confirm(`確定隱藏員工「${name}」嗎？\n(隱藏後資料仍會保留在資料庫，可隨時復原)`)) {
+            const confirmed = await window.customConfirm(`確定隱藏員工「${name}」嗎？\n(隱藏後資料仍會保留在資料庫，可隨時復原)`);
+            if(confirmed) {
                 if(!window.staffGroups[gi].hiddenMembers) window.staffGroups[gi].hiddenMembers = [];
                 if(!window.staffGroups[gi].hiddenMembers.includes(name)) {
                     window.staffGroups[gi].hiddenMembers.push(name);
@@ -652,7 +737,7 @@
             const visibleMembers = window.staffGroups[gi].members.filter(m => !hiddenList.includes(m));
             const oldName = visibleMembers[mi];
             const actualIdx = window.staffGroups[gi].members.indexOf(oldName);
-            const newName = prompt("更換姓名 (將同步更新所有歷史紀錄):", oldName);
+            const newName = await window.customPrompt("更換姓名 (將同步更新所有歷史紀錄):", oldName);
             if(newName && newName !== oldName) {
                 window.staffGroups[gi].members[actualIdx] = newName;
                 Object.keys(window.schedule).forEach(date => {
@@ -666,9 +751,9 @@
         };
 
         window.promptCopyPrevMonth = async () => {
-            const pwd = prompt("請輸入操作密碼 (避免誤觸):");
+            const pwd = await window.customPrompt("請輸入操作密碼 (避免誤觸):", "", "password");
             if (pwd !== "8888") {
-                if (pwd !== null) alert("密碼錯誤！");
+                if (pwd !== null) await window.customAlert("密碼錯誤！", "error");
                 return;
             }
             
@@ -687,14 +772,14 @@
                     window.requiredStaff = prevDoc.data()?.requiredStaffCount || 14;
                     await window.savePersonnel();
                     window.render();
-                    alert("✅ 成功複製上個月的人員名單！");
+                    await window.customAlert("成功複製上個月的人員名單！", "success");
                     window.closeModal();
                 } else {
-                    alert("上個月沒有人員名單紀錄。");
+                    await window.customAlert("上個月沒有人員名單紀錄。", "info");
                 }
             } catch (e) {
                 console.error("Copy failed", e);
-                alert("讀取失敗，請檢查網路連線。");
+                await window.customAlert("讀取失敗，請檢查網路連線。", "error");
             }
         };
 
@@ -997,15 +1082,17 @@
 
         window.openLogin = () => {
             const box = document.getElementById('modalBox');
-            box.innerHTML = `<div class="p-8 text-center"><h3 class="text-xl font-black text-slate-800">管理者驗證</h3><input type="password" id="pwdIn" class="w-full mt-6 bg-slate-50 border border-slate-200 rounded-xl py-5 text-center text-4xl font-black outline-none" onkeydown="if(event.key==='Enter') window.verify()"><div class="grid grid-cols-2 gap-3 mt-8"><button onclick="window.closeModal()" class="py-4 font-bold text-slate-400 text-sm">取消</button><button onclick="window.verify()" class="bg-blue-600 text-white py-4 rounded-xl font-black text-sm">確認</button></div></div>`;
+            box.innerHTML = `<div class="p-8 text-center"><h3 class="text-xl font-black text-slate-800">管理者驗證</h3><input type="password" id="pwdIn" class="w-full mt-6 bg-slate-50 border border-slate-200 rounded-xl py-5 text-center text-4xl font-black outline-none" onkeydown="if(event.key==='Enter') window.verify()"><div class="grid grid-cols-2 gap-3 mt-8"><button onclick="window.closeModal()" class="py-4 font-bold text-slate-400 text-sm">取消</button><button onclick="window.verify()" class="bg-blue-600 text-white py-4 rounded-xl font-black text-sm transition-transform active:scale-95">確認</button></div></div>`;
             document.getElementById('modalOverlay').classList.remove('hidden');
             setTimeout(() => document.getElementById('pwdIn').focus(), 100);
         };
 
-        window.verify = () => {
+        window.verify = async () => {
             if(document.getElementById('pwdIn').value === window.PASS_MASTER) {
                 window.isAdmin = true; window.closeModal(); window.renderAdminTools(); window.render(); window.renderToolbar();
-            } else { alert("金鑰錯誤"); }
+            } else { 
+                await window.customAlert("金鑰錯誤", "error"); 
+            }
         };
 
         window.handleLockClick = () => { if (!window.isAdmin) window.openLogin(); else { const key = `${window.currentYear}-${window.currentMonth + 1}`; window.lockedMonths[key] = !window.lockedMonths[key]; if (auth.currentUser) window.fbSetDoc(window.getRef('lock_state', 'current'), { data: window.lockedMonths }); } };
